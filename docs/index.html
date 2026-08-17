@@ -1,0 +1,1337 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Project 80"/>
+<meta name="description" content="Personal fitness & weight-loss dashboard. Goal: 99.9 kg → 80 kg by Jan 1, 2027."/>
+<link rel="manifest" href="manifest.json"/>
+<title>Project 80</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+<style>
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #13131a;
+    --surface2: #1c1c27;
+    --border:   #2a2a3a;
+    --accent:   #7c6bff;
+    --accent2:  #ff6b6b;
+    --accent3:  #6bffb8;
+    --text:     #e8e8f0;
+    --muted:    #6b6b80;
+    --success:  #4caf82;
+    --warning:  #f5a623;
+    --radius:   16px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body, #root { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; overflow: hidden; }
+  body { padding-top: var(--safe-top); padding-bottom: var(--safe-bot); }
+  input, select, textarea, button { font-family: inherit; color: var(--text); }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  ::-webkit-scrollbar { display: none; }
+  .app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; position: relative; }
+
+  /* Nav */
+  .nav { display: flex; background: rgba(10,10,15,0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + var(--safe-bot)); justify-content: space-around; position: sticky; bottom: 0; z-index: 100; flex-shrink: 0; }
+  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 10px; border: none; background: none; cursor: pointer; min-width: 52px; }
+  .nav-btn span:first-child { font-size: 20px; line-height:1; }
+  .nav-btn span:last-child { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
+  .nav-btn.active span:last-child { color: var(--accent); }
+  .nav-btn.active span:first-child { filter: drop-shadow(0 0 6px var(--accent)); }
+
+  /* Page */
+  .page { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 8px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+  .page-date { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .card-sm { padding: 12px; }
+  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .card-val { font-size: 36px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+  .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+
+  /* Stat tiles */
+  .stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 12px; }
+  .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height:1.1; }
+  .stat-unit { font-size: 11px; font-weight: 600; color: var(--muted); }
+
+  /* Progress bar */
+  .progress-wrap { background: var(--surface2); border-radius: 100px; overflow: hidden; height: 8px; }
+  .progress-bar { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  /* Buttons */
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 20px; border-radius: 14px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: -0.01em; transition: transform 0.15s, opacity 0.15s; -webkit-user-select: none; }
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: rgba(255,107,107,0.15); color: var(--accent2); border: 1px solid rgba(255,107,107,0.3); }
+  .btn-sm { padding: 9px 16px; font-size: 13px; border-radius: 10px; }
+  .btn-icon { padding: 12px; border-radius: 12px; }
+
+  /* Input */
+  .input-group { margin-bottom: 12px; }
+  .input-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; font-size: 16px; color: var(--text); outline: none; transition: border-color 0.2s; -webkit-appearance: none; }
+  .input:focus { border-color: var(--accent); }
+  .input::placeholder { color: var(--muted); }
+
+  /* Pill tabs */
+  .tabs { display: flex; background: var(--surface); border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 16px; overflow-x: auto; }
+  .tab { padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; border: none; background: none; color: var(--muted); cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+  .tab.active { background: var(--accent); color: #fff; }
+
+  /* Checkbox habit */
+  .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .habit-row:last-child { border-bottom: none; }
+  .habit-label { font-size: 15px; font-weight: 500; }
+  .habit-time { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .check-btn { width: 28px; height: 28px; border-radius: 8px; border: 2px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; flex-shrink: 0; }
+  .check-btn.checked { background: var(--success); border-color: var(--success); }
+
+  /* Streak badge */
+  .streak-badge { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #ff6b35, #ff6b6b); border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; }
+
+  /* Milestone */
+  .milestone { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .milestone:last-child { border-bottom: none; }
+  .milestone-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .milestone.achieved .milestone-icon { background: linear-gradient(135deg, var(--accent), var(--accent3)); }
+  .milestone.pending .milestone-icon { background: var(--surface2); }
+  .milestone-info { flex: 1; }
+  .milestone-name { font-size: 14px; font-weight: 600; }
+  .milestone-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Tag */
+  .tag { display: inline-flex; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--muted); margin: 2px; }
+
+  /* Section label */
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+
+  /* Trend msg */
+  .trend-msg { background: linear-gradient(135deg, rgba(124,107,255,0.1), rgba(107,255,184,0.1)); border: 1px solid rgba(124,107,255,0.3); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--text); }
+  .trend-msg strong { color: var(--accent3); }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; }
+  .modal { background: var(--surface); border-radius: 24px 24px 0 0; padding: 20px 16px calc(20px + var(--safe-bot)); width: 100%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); }
+  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
+
+  /* Achievement */
+  .achievement { background: linear-gradient(135deg, rgba(124,107,255,0.15), rgba(107,255,184,0.15)); border: 1px solid rgba(124,107,255,0.4); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .ach-icon { font-size: 24px; }
+  .ach-name { font-size: 13px; font-weight: 600; }
+  .ach-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* Toast */
+  .toast { position: fixed; top: calc(var(--safe-top) + 12px); left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; font-size: 13px; font-weight: 600; z-index: 999; white-space: nowrap; backdrop-filter: blur(20px); animation: slideDown 0.3s ease; }
+  @keyframes slideDown { from { opacity:0; transform: translateX(-50%) translateY(-12px);} to { opacity:1; transform: translateX(-50%) translateY(0);} }
+
+  /* Hero ring */
+  .ring-wrap { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-pct { font-size: 30px; font-weight: 800; letter-spacing: -0.05em; }
+  .ring-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-text { font-size: 14px; line-height: 1.5; }
+
+  /* Reminder */
+  .reminder-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .reminder-time { font-size: 17px; font-weight: 700; min-width: 52px; letter-spacing: -0.02em; }
+  .reminder-label { flex: 1; font-size: 14px; font-weight: 500; }
+  .toggle { width: 44px; height: 26px; border-radius: 13px; border: none; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .toggle.on { background: var(--accent); }
+  .toggle.off { background: var(--border); }
+  .toggle::after { content:''; position: absolute; top:3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 0.2s; }
+  .toggle.on::after { left: 21px; }
+  .toggle.off::after { left: 3px; }
+
+  /* Recharts overrides */
+  .recharts-tooltip-wrapper { border-radius: 10px !important; }
+  .recharts-default-tooltip { background: var(--surface2) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; }
+  .recharts-cartesian-axis-tick text { fill: var(--muted) !important; font-size: 10px !important; }
+  .recharts-cartesian-grid line { stroke: var(--border) !important; }
+
+  /* Nutrition compliance */
+  .compliance-ring { width: 80px; height: 80px; }
+  .compliance-val { font-size: 18px; font-weight: 800; }
+
+  /* Section divider */
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  /* Glowing accent number */
+  .glow-num { background: linear-gradient(135deg, var(--accent), var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  /* Speed dial FAB */
+  .fab { position: fixed; bottom: calc(80px + var(--safe-bot)); right: 16px; width: 52px; height: 52px; border-radius: 16px; background: var(--accent); border: none; color: #fff; font-size: 24px; cursor: pointer; box-shadow: 0 4px 20px rgba(124,107,255,0.4); z-index: 90; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+  .fab:active { transform: scale(0.93); }
+
+  /* Cycling achievement badge */
+  .cyc-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .cyc-badge.unlocked { border-color: rgba(107,255,184,0.4); background: rgba(107,255,184,0.07); }
+  .cyc-badge-icon { font-size: 22px; }
+  .cyc-badge-name { font-size: 13px; font-weight: 600; }
+  .cyc-badge-sub { font-size: 11px; color: var(--muted); }
+
+  /* Nutrition category */
+  .nutrition-cat { background: var(--surface2); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  .nutrition-cat-header { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .nutrition-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+  .nutrition-item-name { font-size: 14px; font-weight: 500; }
+
+  /* Loading */
+  .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 14px; }
+
+  /* Recharts custom */
+  .chart-wrap { width:100%; height:180px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+const { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, BarChart, Bar, AreaChart, Area } = Recharts;
+
+/* ─── Constants ─── */
+const GOAL_WEIGHT = 80;
+const START_WEIGHT = 99.9;
+const GOAL_DATE = dayjs('2027-01-01');
+const today = () => dayjs().format('YYYY-MM-DD');
+
+/* ─── Storage helpers ─── */
+const load = (k, d) => { try { const v = localStorage.getItem('p80_'+k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem('p80_'+k, JSON.stringify(v)); } catch {} };
+
+/* ─── Toast ─── */
+let toastTimer;
+function Toast({ msg, clear }) {
+  useEffect(() => { toastTimer = setTimeout(clear, 2500); return () => clearTimeout(toastTimer); }, []);
+  if (!msg) return null;
+  return React.createElement('div', { className: 'toast' }, msg);
+}
+
+/* ─── Ring ─── */
+function Ring({ pct, label, color = '#7c6bff', size = 160 }) {
+  const r = (size - 16) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  return React.createElement('div', { className: 'ring-wrap', style: { width: size, height: size } },
+    React.createElement('svg', { className: 'ring-svg', width: size, height: size, viewBox: `0 0 ${size} ${size}` },
+      React.createElement('circle', { cx: size/2, cy: size/2, r, fill:'none', stroke:'#1c1c27', strokeWidth:10 }),
+      React.createElement('circle', { cx: size/2, cy: size/2, r, fill:'none', stroke: color, strokeWidth:10,
+        strokeLinecap:'round', strokeDasharray: circ, strokeDashoffset: offset, style:{transition:'stroke-dashoffset 1s ease'} })
+    ),
+    React.createElement('div', { className:'ring-center' },
+      React.createElement('div', { className:'ring-pct', style:{color} }, Math.round(pct)+'%'),
+      React.createElement('div', { className:'ring-label' }, label)
+    )
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [tab, setTab] = useState('dashboard');
+  const [toast, setToast] = useState('');
+  const showToast = msg => { setToast(msg); };
+
+  // Global data state
+  const [weights, setWeights] = useState(() => load('weights', []));
+  const [activities, setActivities] = useState(() => load('activities', []));
+  const [nutrition, setNutrition] = useState(() => load('nutrition', []));
+  const [habits, setHabits] = useState(() => load('habits', {}));
+  const [reminders, setReminders] = useState(() => load('reminders', defaultReminders()));
+
+  const saveWeights = w => { setWeights(w); save('weights', w); };
+  const saveActivities = a => { setActivities(a); save('activities', a); };
+  const saveNutrition = n => { setNutrition(n); save('nutrition', n); };
+  const saveHabits = h => { setHabits(h); save('habits', h); };
+  const saveReminders = r => { setReminders(r); save('reminders', r); };
+
+  const tabs = [
+    { id:'dashboard', icon:'⚡', label:'Home' },
+    { id:'weight',    icon:'⚖️',  label:'Weight' },
+    { id:'activity',  icon:'🚴', label:'Activity' },
+    { id:'nutrition', icon:'🥗',  label:'Nutrition' },
+    { id:'habits',    icon:'✅',  label:'Habits' },
+    { id:'more',      icon:'⋯',   label:'More' },
+  ];
+
+  const latestWeight = useMemo(() => {
+    if (!weights.length) return START_WEIGHT;
+    const sorted = [...weights].sort((a,b) => b.date.localeCompare(a.date));
+    return sorted[0].weight;
+  }, [weights]);
+
+  return React.createElement('div', { className:'app' },
+    toast ? React.createElement(Toast, { msg:toast, clear: () => setToast('') }) : null,
+    React.createElement('div', { className:'page', key:tab },
+      tab === 'dashboard'  && React.createElement(Dashboard, { weights, activities, habits, latestWeight }),
+      tab === 'weight'     && React.createElement(WeightTracker, { weights, saveWeights, showToast }),
+      tab === 'activity'   && React.createElement(ActivityTracker, { activities, saveActivities, showToast }),
+      tab === 'nutrition'  && React.createElement(NutritionTracker, { nutrition, saveNutrition, showToast }),
+      tab === 'habits'     && React.createElement(HabitTracker, { habits, saveHabits }),
+      tab === 'more'       && React.createElement(MorePage, { weights, activities, nutrition, habits, reminders, saveReminders, showToast }),
+    ),
+    React.createElement('nav', { className:'nav' },
+      tabs.map(t => React.createElement('button', {
+        key: t.id, className: 'nav-btn' + (tab===t.id?' active':''),
+        onClick: () => setTab(t.id)
+      },
+        React.createElement('span', null, t.icon),
+        React.createElement('span', null, t.label)
+      ))
+    )
+  );
+}
+
+/* ─── Dashboard ─── */
+function Dashboard({ weights, activities, habits, latestWeight }) {
+  const sorted = useMemo(() => [...weights].sort((a,b) => a.date.localeCompare(b.date)), [weights]);
+  const daysRemaining = GOAL_DATE.diff(dayjs(), 'day');
+  const totalLost = +(START_WEIGHT - latestWeight).toFixed(1);
+  const remaining = +(latestWeight - GOAL_WEIGHT).toFixed(1);
+  const pct = +((totalLost / (START_WEIGHT - GOAL_WEIGHT)) * 100).toFixed(1);
+
+  const weeklyAvg = useMemo(() => {
+    if (sorted.length < 2) return 0;
+    const recent = sorted.slice(-14);
+    if (recent.length < 2) return 0;
+    const firstW = recent[0].weight, lastW = recent[recent.length-1].weight;
+    const days = dayjs(recent[recent.length-1].date).diff(dayjs(recent[0].date), 'day') || 1;
+    return +((firstW - lastW) / days * 7).toFixed(2);
+  }, [sorted]);
+
+  const projectedWeight = useMemo(() => {
+    if (weeklyAvg <= 0) return null;
+    const kgPerDay = weeklyAvg / 7;
+    return +(latestWeight - kgPerDay * daysRemaining).toFixed(1);
+  }, [weeklyAvg, latestWeight, daysRemaining]);
+
+  const todayHabits = habits[today()] || {};
+  const habitKeys = Object.keys(todayHabits);
+  const completed = habitKeys.filter(k => todayHabits[k]).length;
+  const habitPct = habitKeys.length ? Math.round(completed / habitKeys.length * 100) : 0;
+
+  const totalCals = useMemo(() => activities.filter(a => {
+    return dayjs(a.date).isAfter(dayjs().subtract(7,'day'));
+  }).reduce((s,a) => s + (a.calories||0), 0), [activities]);
+
+  return React.createElement('div', null,
+    // Header
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', null,
+        React.createElement('div', { style:{fontSize:13,color:'var(--muted)',fontWeight:600} }, dayjs().format('dddd, D MMMM')),
+        React.createElement('div', { className:'page-title' }, '⚡ Project 80')
+      ),
+      React.createElement('div', { style:{textAlign:'right'} },
+        React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase'} }, 'Days Left'),
+        React.createElement('div', { style:{fontSize:26,fontWeight:800,letterSpacing:'-0.04em',color:'var(--accent)'} }, daysRemaining)
+      )
+    ),
+
+    // Progress ring
+    React.createElement('div', { className:'card', style:{textAlign:'center',paddingTop:20,paddingBottom:20} },
+      React.createElement(Ring, { pct: Math.min(pct,100), label:'Progress' }),
+      React.createElement('div', { style:{display:'flex',justifyContent:'space-around',marginTop:12} },
+        React.createElement('div', null,
+          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Start'),
+          React.createElement('div', { style:{fontSize:18,fontWeight:700} }, START_WEIGHT+' kg')
+        ),
+        React.createElement('div', null,
+          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Current'),
+          React.createElement('div', { style:{fontSize:18,fontWeight:700,color:'var(--accent)'} }, latestWeight+' kg')
+        ),
+        React.createElement('div', null,
+          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Goal'),
+          React.createElement('div', { style:{fontSize:18,fontWeight:700,color:'var(--accent3)'} }, GOAL_WEIGHT+' kg')
+        )
+      )
+    ),
+
+    // Stats grid
+    React.createElement('div', { className:'grid-2' },
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Lost'),
+        React.createElement('div', { className:'stat-val' }, totalLost > 0 ? React.createElement('span', { className:'glow-num' }, totalLost+' kg') : '0 kg')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Remaining'),
+        React.createElement('div', { className:'stat-val' }, remaining+' kg')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Wk Avg Loss'),
+        React.createElement('div', { className:'stat-val' }, weeklyAvg > 0 ? weeklyAvg+' kg' : '—')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Cals (7d)'),
+        React.createElement('div', { className:'stat-val' }, totalCals ? totalCals.toLocaleString() : '—')
+      )
+    ),
+
+    // Projection card
+    projectedWeight !== null && React.createElement('div', { className:'card' },
+      React.createElement('div', { className:'card-title' }, '🎯 Goal Projection'),
+      React.createElement('div', { className:'trend-msg' },
+        projectedWeight <= GOAL_WEIGHT
+          ? React.createElement('span', null, '🟢 At your current pace you are projected to reach ', React.createElement('strong', null, projectedWeight+' kg'), ' by Jan 1, 2027. You\'re on track!')
+          : React.createElement('span', null, '📊 At your current pace you are projected to reach ', React.createElement('strong', null, projectedWeight+' kg'), '. Increase average weekly loss by ', React.createElement('strong', null, +((projectedWeight - GOAL_WEIGHT) / (daysRemaining/7)).toFixed(2)+' kg/wk'), ' to reach 80 kg.')
+      )
+    ),
+
+    // Habit compliance
+    React.createElement('div', { className:'card' },
+      React.createElement('div', { style:{display:'flex',alignItems:'center',justifyContent:'space-between'} },
+        React.createElement('div', null,
+          React.createElement('div', { className:'card-title' }, "Today's Habits"),
+          React.createElement('div', { style:{fontSize:28,fontWeight:800,letterSpacing:'-0.04em'} }, habitPct+'%'),
+          React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, completed+' of '+habitKeys.length+' completed')
+        ),
+        React.createElement(Ring, { pct: habitPct, label:'Done', size:80, color: habitPct >= 80 ? '#6bffb8' : '#7c6bff' })
+      ),
+      React.createElement('div', { style:{marginTop:12} },
+        React.createElement('div', { className:'progress-wrap' },
+          React.createElement('div', { className:'progress-bar', style:{width:habitPct+'%'} })
+        )
+      )
+    ),
+
+    // Mini weight chart
+    sorted.length > 1 && React.createElement('div', { className:'card' },
+      React.createElement('div', { className:'card-title' }, 'Weight Trend'),
+      React.createElement('div', { className:'chart-wrap' },
+        React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
+          React.createElement(AreaChart, { data: sorted.slice(-30).map(w=>({...w,w:w.weight})) },
+            React.createElement('defs', null,
+              React.createElement('linearGradient', { id:'wg', x1:0,y1:0,x2:0,y2:1 },
+                React.createElement('stop', { offset:'5%', stopColor:'#7c6bff', stopOpacity:0.3 }),
+                React.createElement('stop', { offset:'95%', stopColor:'#7c6bff', stopOpacity:0 })
+              )
+            ),
+            React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
+            React.createElement(XAxis, { dataKey:'date', tickFormatter: d=>dayjs(d).format('D/M'), tick:{fontSize:9} }),
+            React.createElement(YAxis, { domain:['dataMin - 0.5','dataMax + 0.5'], tick:{fontSize:9} }),
+            React.createElement(Tooltip, { formatter: v=>[v+' kg','Weight'], labelFormatter: d=>dayjs(d).format('D MMM') }),
+            React.createElement(ReferenceLine, { y:GOAL_WEIGHT, stroke:'#6bffb8', strokeDasharray:'4 4', label:{ value:'Goal', fill:'#6bffb8', fontSize:10 } }),
+            React.createElement(Area, { type:'monotone', dataKey:'w', stroke:'#7c6bff', fill:'url(#wg)', strokeWidth:2, dot:false })
+          )
+        )
+      )
+    )
+  );
+}
+
+/* ─── Weight Tracker ─── */
+function WeightTracker({ weights, saveWeights, showToast }) {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ date: today(), weight:'', bodyFat:'', waist:'' });
+
+  const sorted = useMemo(() => [...weights].sort((a,b) => a.date.localeCompare(b.date)), [weights]);
+
+  const avg7 = useMemo(() => {
+    const last7 = sorted.slice(-7);
+    if (!last7.length) return null;
+    return +(last7.reduce((s,w)=>s+w.weight,0)/last7.length).toFixed(2);
+  }, [sorted]);
+
+  const avg30 = useMemo(() => {
+    const last30 = sorted.slice(-30);
+    if (!last30.length) return null;
+    return +(last30.reduce((s,w)=>s+w.weight,0)/last30.length).toFixed(2);
+  }, [sorted]);
+
+  const lowest = useMemo(() => sorted.length ? Math.min(...sorted.map(w=>w.weight)) : null, [sorted]);
+
+  const latest = sorted.length ? sorted[sorted.length-1].weight : null;
+  const prevLowest = lowest;
+
+  const trendMsg = useMemo(() => {
+    if (sorted.length < 4) return null;
+    const last4 = sorted.slice(-4);
+    const allUp = last4.every((w,i)=>i===0||w.weight>last4[i-1].weight);
+    if (!allUp) return null;
+    const fromLowest = +(latest - prevLowest).toFixed(1);
+    const trend7 = avg7 && sorted.length >= 8 ? +(sorted[sorted.length-8].weight - avg7).toFixed(1) : 0;
+    return `Weight is up ${fromLowest} kg from lowest point. ${trend7 > 0 ? 'Current 7-day trend remains downward.' : 'Monitor trend over coming days.'} Continue current plan.`;
+  }, [sorted, latest, prevLowest, avg7]);
+
+  const predictedDate = useMemo(() => {
+    if (sorted.length < 2 || !latest) return null;
+    const first = sorted[0], last = sorted[sorted.length-1];
+    const days = dayjs(last.date).diff(dayjs(first.date),'day') || 1;
+    const ratePerDay = (first.weight - last.weight) / days;
+    if (ratePerDay <= 0) return null;
+    const daysLeft = (latest - GOAL_WEIGHT) / ratePerDay;
+    return dayjs().add(daysLeft,'day').format('D MMM YYYY');
+  }, [sorted, latest]);
+
+  const addEntry = () => {
+    if (!form.weight) { showToast('Enter your weight'); return; }
+    const entry = { ...form, weight: +form.weight, bodyFat: form.bodyFat ? +form.bodyFat : null, waist: form.waist ? +form.waist : null, id: Date.now() };
+    const existing = weights.filter(w => w.date !== form.date);
+    saveWeights([...existing, entry]);
+    setShowForm(false);
+    setForm({ date: today(), weight:'', bodyFat:'', waist:'' });
+    showToast('✅ Weight logged');
+  };
+
+  return React.createElement('div', null,
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', { className:'page-title' }, '⚖️ Weight'),
+      React.createElement('button', { className:'btn btn-primary btn-sm', style:{width:'auto'}, onClick:()=>setShowForm(true) }, '+ Log')
+    ),
+
+    // Stats
+    React.createElement('div', { className:'grid-2' },
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Current'),
+        React.createElement('div', { className:'stat-val' }, latest ? latest+' kg' : '—')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, 'Lowest'),
+        React.createElement('div', { className:'stat-val glow-num' }, lowest ? lowest+' kg' : '—')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, '7-Day Avg'),
+        React.createElement('div', { className:'stat-val' }, avg7 ? avg7+' kg' : '—')
+      ),
+      React.createElement('div', { className:'stat-tile' },
+        React.createElement('div', { className:'stat-label' }, '30-Day Avg'),
+        React.createElement('div', { className:'stat-val' }, avg30 ? avg30+' kg' : '—')
+      )
+    ),
+
+    trendMsg && React.createElement('div', { className:'trend-msg', style:{marginBottom:12} }, '📊 '+trendMsg),
+
+    predictedDate && React.createElement('div', { className:'card', style:{background:'rgba(107,255,184,0.07)',borderColor:'rgba(107,255,184,0.3)'} },
+      React.createElement('div', { className:'card-title' }, '🗓 Predicted Completion'),
+      React.createElement('div', { style:{fontSize:22,fontWeight:700,color:'var(--accent3)'} }, predictedDate),
+      React.createElement('div', { className:'card-sub' }, 'Based on current trend')
+    ),
+
+    // Chart
+    sorted.length > 1 && React.createElement('div', { className:'card' },
+      React.createElement('div', { className:'card-title' }, 'Weight Trend'),
+      React.createElement('div', { className:'chart-wrap' },
+        React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
+          React.createElement(AreaChart, { data: sorted.map(w=>({...w,w:w.weight})) },
+            React.createElement('defs', null,
+              React.createElement('linearGradient', { id:'wg2', x1:0,y1:0,x2:0,y2:1 },
+                React.createElement('stop', { offset:'5%', stopColor:'#7c6bff', stopOpacity:0.3 }),
+                React.createElement('stop', { offset:'95%', stopColor:'#7c6bff', stopOpacity:0 })
+              )
+            ),
+            React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
+            React.createElement(XAxis, { dataKey:'date', tickFormatter: d=>dayjs(d).format('D/M'), tick:{fontSize:9} }),
+            React.createElement(YAxis, { domain:['dataMin - 1','dataMax + 1'], tick:{fontSize:9}, width:38 }),
+            React.createElement(Tooltip, { formatter: v=>[v+' kg','Weight'], labelFormatter: d=>dayjs(d).format('D MMM') }),
+            React.createElement(ReferenceLine, { y:GOAL_WEIGHT, stroke:'#6bffb8', strokeDasharray:'4 4' }),
+            React.createElement(ReferenceLine, { y:avg7||0, stroke:'#f5a623', strokeDasharray:'3 3' }),
+            React.createElement(Area, { type:'monotone', dataKey:'w', stroke:'#7c6bff', fill:'url(#wg2)', strokeWidth:2, dot:{r:3,fill:'#7c6bff'} })
+          )
+        )
+      ),
+      React.createElement('div', { style:{display:'flex',gap:12,marginTop:8,flexWrap:'wrap'} },
+        React.createElement('div', { className:'tag', style:{color:'#6bffb8'} }, '— Goal 80 kg'),
+        React.createElement('div', { className:'tag', style:{color:'#f5a623'} }, '— 7-day avg')
+      )
+    ),
+
+    // Log entries
+    sorted.length > 0 && React.createElement('div', { className:'card' },
+      React.createElement('div', { className:'card-title' }, 'Recent Entries'),
+      [...sorted].reverse().slice(0,10).map(w =>
+        React.createElement('div', { key:w.id||w.date, className:'habit-row' },
+          React.createElement('div', null,
+            React.createElement('div', { className:'habit-label' }, w.weight+' kg'),
+            React.createElement('div', { className:'habit-time' }, dayjs(w.date).format('D MMM YYYY') + (w.bodyFat?' · '+w.bodyFat+'% BF':'') + (w.waist?' · '+w.waist+' cm':''))
+          ),
+          React.createElement('button', { onClick:()=>{ saveWeights(weights.filter(x=>(x.id||x.date)!==(w.id||w.date))); showToast('Deleted'); }, className:'btn btn-danger btn-sm', style:{padding:'6px 10px'} }, '✕')
+        )
+      )
+    ),
+
+    !sorted.length && React.createElement('div', { className:'empty' },
+      React.createElement('div', { className:'empty-icon' }, '⚖️'),
+      React.createElement('div', { className:'empty-text' }, 'No weight entries yet.\nTap + Log to add today\'s weight.')
+    ),
+
+    // Form modal
+    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
+      React.createElement('div', { className:'modal' },
+        React.createElement('div', { className:'modal-handle' }),
+        React.createElement('div', { className:'modal-title' }, 'Log Weight'),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Date'),
+          React.createElement('input', { type:'date', className:'input', value:form.date, onChange:e=>setForm({...form,date:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Weight (kg)'),
+          React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 95.4', value:form.weight, onChange:e=>setForm({...form,weight:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Body Fat % (optional)'),
+          React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 24.5', value:form.bodyFat, onChange:e=>setForm({...form,bodyFat:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Waist cm (optional)'),
+          React.createElement('input', { type:'number', step:'0.5', className:'input', placeholder:'e.g. 92.0', value:form.waist, onChange:e=>setForm({...form,waist:e.target.value}) })
+        ),
+        React.createElement('button', { className:'btn btn-primary', onClick:addEntry }, 'Save Entry'),
+        React.createElement('div', { style:{height:8} }),
+        React.createElement('button', { className:'btn btn-secondary', onClick:()=>setShowForm(false) }, 'Cancel')
+      )
+    )
+  );
+}
+
+/* ─── Activity Tracker ─── */
+const ACTIVITY_TYPES = ['Cycling','Kettlebell','Football','Gym','Walking'];
+
+function ActivityTracker({ activities, saveActivities, showToast }) {
+  const [tab2, setTab2] = useState('log');
+  const [showForm, setShowForm] = useState(false);
+  const [actType, setActType] = useState('Cycling');
+  const [form, setForm] = useState({
+    date: today(), duration:'', calories:'', distance:'', speed:'', elevation:'',
+    kettlebellWeight:'', exercises:'', muscleGroups:'', steps:'', notes:''
+  });
+
+  const addActivity = () => {
+    if (!form.duration) { showToast('Enter duration'); return; }
+    const entry = { ...form, type: actType, duration:+form.duration, calories: form.calories ? +form.calories : 0,
+      distance: form.distance ? +form.distance : 0, id: Date.now() };
+    saveActivities([...activities, entry]);
+    setShowForm(false);
+    setForm({ date:today(), duration:'', calories:'', distance:'', speed:'', elevation:'', kettlebellWeight:'', exercises:'', muscleGroups:'', steps:'', notes:'' });
+    showToast('✅ Activity logged');
+  };
+
+  const weekActs = activities.filter(a => dayjs(a.date).isAfter(dayjs().subtract(7,'day')));
+  const monthActs = activities.filter(a => dayjs(a.date).isAfter(dayjs().subtract(30,'day')));
+  const totalCalsWeek = weekActs.reduce((s,a)=>s+(a.calories||0),0);
+  const totalCalsMonth = monthActs.reduce((s,a)=>s+(a.calories||0),0);
+
+  // Cycling stats
+  const rides = activities.filter(a=>a.type==='Cycling');
+  const totalKm = rides.reduce((s,a)=>s+(a.distance||0),0);
+  const totalElev = rides.reduce((s,a)=>s+(+a.elevation||0),0);
+  const longestRide = rides.length ? Math.max(...rides.map(a=>a.distance||0)) : 0;
+  const fastestSpeed = rides.length ? Math.max(...rides.map(a=>+a.speed||0)) : 0;
+  const cycBadges = [
+    { km:100, icon:'🥉', name:'First 100 km', desc:'Bronze milestone' },
+    { km:250, icon:'🥈', name:'First 250 km', desc:'Silver milestone' },
+    { km:500, icon:'🥇', name:'First 500 km', desc:'Gold milestone' },
+    { km:1000, icon:'🏆', name:'First 1000 km', desc:'Legend milestone' },
+  ];
+
+  const actsByDay = useMemo(() => {
+    const map = {};
+    monthActs.forEach(a => {
+      const d = a.date;
+      if (!map[d]) map[d] = 0;
+      map[d] += a.calories||0;
+    });
+    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,cals])=>({date:dayjs(date).format('D/M'),cals}));
+  }, [activities]);
+
+  return React.createElement('div', null,
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', { className:'page-title' }, '🚴 Activity'),
+      React.createElement('button', { className:'btn btn-primary btn-sm', style:{width:'auto'}, onClick:()=>setShowForm(true) }, '+ Log')
+    ),
+
+    React.createElement('div', { className:'tabs' },
+      ['log','cycling','stats'].map(t =>
+        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
+          t==='log'?'Recent':t==='cycling'?'Cycling':'Stats'
+        )
+      )
+    ),
+
+    tab2 === 'stats' && React.createElement('div', null,
+      React.createElement('div', { className:'grid-2' },
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Cals (7d)'),
+          React.createElement('div', { className:'stat-val glow-num' }, totalCalsWeek.toLocaleString())
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Cals (30d)'),
+          React.createElement('div', { className:'stat-val' }, totalCalsMonth.toLocaleString())
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Sessions (7d)'),
+          React.createElement('div', { className:'stat-val' }, weekActs.length)
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Sessions (30d)'),
+          React.createElement('div', { className:'stat-val' }, monthActs.length)
+        )
+      ),
+      actsByDay.length > 1 && React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'Calories Burned (30d)'),
+        React.createElement('div', { className:'chart-wrap' },
+          React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
+            React.createElement(BarChart, { data: actsByDay },
+              React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
+              React.createElement(XAxis, { dataKey:'date', tick:{fontSize:9} }),
+              React.createElement(YAxis, { tick:{fontSize:9}, width:36 }),
+              React.createElement(Tooltip, { formatter:v=>[v+' kcal','Calories'] }),
+              React.createElement(Bar, { dataKey:'cals', fill:'#7c6bff', radius:[4,4,0,0] })
+            )
+          )
+        )
+      )
+    ),
+
+    tab2 === 'cycling' && React.createElement('div', null,
+      React.createElement('div', { className:'grid-2' },
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Total Rides'),
+          React.createElement('div', { className:'stat-val glow-num' }, rides.length)
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Total km'),
+          React.createElement('div', { className:'stat-val' }, totalKm.toFixed(1))
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Longest'),
+          React.createElement('div', { className:'stat-val' }, longestRide+'km')
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Best Speed'),
+          React.createElement('div', { className:'stat-val' }, fastestSpeed ? fastestSpeed+' km/h' : '—')
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Elevation'),
+          React.createElement('div', { className:'stat-val' }, totalElev.toFixed(0)+'m')
+        ),
+        React.createElement('div', { className:'stat-tile' },
+          React.createElement('div', { className:'stat-label' }, 'Cals Burned'),
+          React.createElement('div', { className:'stat-val' }, rides.reduce((s,a)=>s+(a.calories||0),0).toLocaleString())
+        )
+      ),
+      React.createElement('div', { className:'section-label' }, 'Achievements'),
+      cycBadges.map(b =>
+        React.createElement('div', { key:b.km, className:'cyc-badge'+(totalKm>=b.km?' unlocked':'') },
+          React.createElement('div', { className:'cyc-badge-icon' }, totalKm>=b.km ? b.icon : '🔒'),
+          React.createElement('div', null,
+            React.createElement('div', { className:'cyc-badge-name' }, b.name),
+            React.createElement('div', { className:'cyc-badge-sub' }, totalKm>=b.km ? 'Unlocked! ' : `${totalKm.toFixed(1)} / ${b.km} km`)
+          )
+        )
+      )
+    ),
+
+    tab2 === 'log' && React.createElement('div', null,
+      [...activities].reverse().slice(0,20).map(a =>
+        React.createElement('div', { key:a.id, className:'card card-sm', style:{marginBottom:8} },
+          React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'} },
+            React.createElement('div', null,
+              React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8} },
+                React.createElement('span', null, actIcon(a.type)),
+                React.createElement('span', { style:{fontWeight:700,fontSize:15} }, a.type)
+              ),
+              React.createElement('div', { style:{fontSize:12,color:'var(--muted)',marginTop:3} },
+                [a.duration&&a.duration+'min', a.distance&&a.distance+'km', a.calories&&a.calories+'kcal'].filter(Boolean).join(' · ')
+              ),
+              a.notes && React.createElement('div', { style:{fontSize:12,color:'var(--muted)',marginTop:2} }, a.notes)
+            ),
+            React.createElement('div', { style:{textAlign:'right'} },
+              React.createElement('div', { style:{fontSize:11,color:'var(--muted)'} }, dayjs(a.date).format('D MMM')),
+              React.createElement('button', { onClick:()=>{ saveActivities(activities.filter(x=>x.id!==a.id)); showToast('Deleted'); }, style:{marginTop:6,fontSize:11,color:'var(--accent2)',background:'none',border:'none',cursor:'pointer'} }, 'Remove')
+            )
+          )
+        )
+      ),
+      !activities.length && React.createElement('div', { className:'empty' },
+        React.createElement('div', { className:'empty-icon' }, '🏃'),
+        React.createElement('div', { className:'empty-text' }, 'No activities yet.\nTap + Log to add a workout.')
+      )
+    ),
+
+    // Form modal
+    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
+      React.createElement('div', { className:'modal' },
+        React.createElement('div', { className:'modal-handle' }),
+        React.createElement('div', { className:'modal-title' }, 'Log Activity'),
+        React.createElement('div', { className:'tabs', style:{marginBottom:12} },
+          ACTIVITY_TYPES.map(t=>
+            React.createElement('button', { key:t, className:'tab'+(actType===t?' active':''), onClick:()=>setActType(t) },
+              actIcon(t)+' '+t
+            )
+          )
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Date'),
+          React.createElement('input', { type:'date', className:'input', value:form.date, onChange:e=>setForm({...form,date:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Duration (min)'),
+          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 45', value:form.duration, onChange:e=>setForm({...form,duration:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Calories Burned'),
+          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 350', value:form.calories, onChange:e=>setForm({...form,calories:e.target.value}) })
+        ),
+        actType==='Cycling' && React.createElement('div', null,
+          React.createElement('div', { className:'input-group' },
+            React.createElement('div', { className:'input-label' }, 'Distance (km)'),
+            React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 25', value:form.distance, onChange:e=>setForm({...form,distance:e.target.value}) })
+          ),
+          React.createElement('div', { className:'input-group' },
+            React.createElement('div', { className:'input-label' }, 'Avg Speed (km/h)'),
+            React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 22', value:form.speed, onChange:e=>setForm({...form,speed:e.target.value}) })
+          ),
+          React.createElement('div', { className:'input-group' },
+            React.createElement('div', { className:'input-label' }, 'Elevation Gain (m)'),
+            React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 180', value:form.elevation, onChange:e=>setForm({...form,elevation:e.target.value}) })
+          )
+        ),
+        actType==='Kettlebell' && React.createElement('div', null,
+          React.createElement('div', { className:'input-group' },
+            React.createElement('div', { className:'input-label' }, 'Kettlebell Weight (kg)'),
+            React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 16', value:form.kettlebellWeight, onChange:e=>setForm({...form,kettlebellWeight:e.target.value}) })
+          ),
+          React.createElement('div', { className:'input-group' },
+            React.createElement('div', { className:'input-label' }, 'Exercises Performed'),
+            React.createElement('input', { type:'text', className:'input', placeholder:'e.g. Swings, Cleans, Press', value:form.exercises, onChange:e=>setForm({...form,exercises:e.target.value}) })
+          )
+        ),
+        actType==='Gym' && React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Muscle Groups'),
+          React.createElement('input', { type:'text', className:'input', placeholder:'e.g. Chest, Back, Shoulders', value:form.muscleGroups, onChange:e=>setForm({...form,muscleGroups:e.target.value}) })
+        ),
+        actType==='Walking' && React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Steps'),
+          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 8500', value:form.steps, onChange:e=>setForm({...form,steps:e.target.value}) })
+        ),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Notes (optional)'),
+          React.createElement('input', { type:'text', className:'input', placeholder:'Any notes...', value:form.notes, onChange:e=>setForm({...form,notes:e.target.value}) })
+        ),
+        React.createElement('button', { className:'btn btn-primary', onClick:addActivity }, 'Save Activity'),
+        React.createElement('div', { style:{height:8} }),
+        React.createElement('button', { className:'btn btn-secondary', onClick:()=>setShowForm(false) }, 'Cancel')
+      )
+    )
+  );
+}
+
+function actIcon(type) {
+  return {Cycling:'🚴',Kettlebell:'🏋️',Football:'⚽',Gym:'💪',Walking:'🚶'}[type]||'🏃';
+}
+
+/* ─── Nutrition Tracker ─── */
+const MEAL_STRUCTURE = {
+  Breakfast: [
+    {id:'jeera', name:'Jeera Water', icon:'💧'},
+    {id:'almonds', name:'Almonds', icon:'🌰'},
+    {id:'flax', name:'Flax Seeds', icon:'🌾'},
+  ],
+  Lunch: [
+    {id:'eggs', name:'Eggs', icon:'🥚'},
+    {id:'chicken_l', name:'Chicken', icon:'🍗'},
+    {id:'other_l', name:'Other', icon:'🍱', custom:true},
+  ],
+  Snack: [
+    {id:'fruit', name:'Fruit', icon:'🍎'},
+    {id:'whey', name:'Whey Protein', icon:'💪'},
+  ],
+  Dinner: [
+    {id:'chicken_d', name:'Chicken', icon:'🍗'},
+    {id:'other_d', name:'Other', icon:'🍱', custom:true},
+  ],
+  Night: [
+    {id:'cinnamon', name:'Cinnamon Water', icon:'🫖'},
+    {id:'date', name:'Date', icon:'🌴'},
+  ],
+};
+
+function NutritionTracker({ nutrition, saveNutrition, showToast }) {
+  const todayEntry = nutrition.find(n=>n.date===today()) || { date:today(), meals:{}, water:0, protein:0, cheat:false, alcohol:false, notes:'' };
+  const [entry, setEntry] = useState(todayEntry);
+  const [showForm, setShowForm] = useState(false);
+  const [tab2, setTab2] = useState('today');
+
+  const updateEntry = (updated) => {
+    setEntry(updated);
+    const others = nutrition.filter(n=>n.date!==today());
+    saveNutrition([...others, updated]);
+  };
+
+  const toggleMeal = (meal, id) => {
+    const meals = { ...entry.meals, [meal]: { ...(entry.meals[meal]||{}), [id]: !(entry.meals[meal]||{})[id] } };
+    updateEntry({ ...entry, meals });
+  };
+
+  const allItems = Object.values(MEAL_STRUCTURE).flat();
+  const checkedItems = Object.values(entry.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
+  const totalItems = allItems.length;
+  const compliance = Math.round(checkedItems/totalItems*100);
+
+  const last30 = nutrition.filter(n=>dayjs(n.date).isAfter(dayjs().subtract(30,'day')));
+  const avgCompliance = last30.length ? Math.round(last30.reduce((s,n)=>{
+    const c = Object.values(n.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
+    return s + c/totalItems*100;
+  },0)/last30.length) : 0;
+
+  return React.createElement('div', null,
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', { className:'page-title' }, '🥗 Nutrition'),
+      React.createElement('div', { style:{display:'flex',gap:8} },
+        React.createElement('button', { className:'btn btn-secondary btn-sm', onClick:()=>setShowForm(true) }, 'Details')
+      )
+    ),
+
+    React.createElement('div', { className:'tabs' },
+      ['today','history'].map(t=>
+        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
+          t==='today'?'Today':'History'
+        )
+      )
+    ),
+
+    tab2==='today' && React.createElement('div', null,
+      // Compliance ring + water
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12} },
+          React.createElement('div', null,
+            React.createElement('div', { className:'card-title' }, "Today's Compliance"),
+            React.createElement('div', { style:{fontSize:32,fontWeight:800,letterSpacing:'-0.04em',color:'var(--accent)'} }, compliance+'%'),
+            React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, checkedItems+' / '+totalItems+' items')
+          ),
+          React.createElement(Ring, { pct:compliance, label:'Today', size:80, color: compliance>=80?'#6bffb8':'#7c6bff' })
+        ),
+        // Water + protein
+        React.createElement('div', { className:'grid-2', style:{marginBottom:0} },
+          React.createElement('div', { style:{background:'var(--surface2)',borderRadius:10,padding:'10px 12px'} },
+            React.createElement('div', { className:'stat-label' }, '💧 Water (L)'),
+            React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginTop:4} },
+              React.createElement('button', { onClick:()=>updateEntry({...entry,water:Math.max(0,+(entry.water-0.25).toFixed(2))}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '−'),
+              React.createElement('span', { style:{fontSize:18,fontWeight:700,minWidth:36,textAlign:'center'} }, entry.water||0),
+              React.createElement('button', { onClick:()=>updateEntry({...entry,water:+(entry.water+0.25).toFixed(2)}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '+')
+            )
+          ),
+          React.createElement('div', { style:{background:'var(--surface2)',borderRadius:10,padding:'10px 12px'} },
+            React.createElement('div', { className:'stat-label' }, '🥩 Protein (g)'),
+            React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginTop:4} },
+              React.createElement('button', { onClick:()=>updateEntry({...entry,protein:Math.max(0,(entry.protein||0)-10)}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '−'),
+              React.createElement('span', { style:{fontSize:18,fontWeight:700,minWidth:36,textAlign:'center'} }, entry.protein||0),
+              React.createElement('button', { onClick:()=>updateEntry({...entry,protein:(entry.protein||0)+10}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '+')
+            )
+          )
+        )
+      ),
+
+      // Cheat / alcohol
+      React.createElement('div', { className:'grid-2' },
+        React.createElement('button', { className:'btn '+(entry.cheat?'btn-danger':'btn-secondary'), style:{border: entry.cheat?'2px solid var(--accent2)':'1px solid var(--border)'}, onClick:()=>updateEntry({...entry,cheat:!entry.cheat}) },
+          '🍕 Cheat '+(entry.cheat?'ON':'OFF')
+        ),
+        React.createElement('button', { className:'btn '+(entry.alcohol?'btn-danger':'btn-secondary'), style:{border: entry.alcohol?'2px solid var(--accent2)':'1px solid var(--border)'}, onClick:()=>updateEntry({...entry,alcohol:!entry.alcohol}) },
+          '🍺 Alcohol '+(entry.alcohol?'ON':'OFF')
+        )
+      ),
+
+      // Meal checklist
+      Object.entries(MEAL_STRUCTURE).map(([meal, items]) =>
+        React.createElement('div', { key:meal, className:'card' },
+          React.createElement('div', { className:'card-title' }, meal),
+          items.map(item =>
+            React.createElement('div', { key:item.id, className:'habit-row' },
+              React.createElement('div', null,
+                React.createElement('div', { className:'habit-label' }, item.icon+' '+item.name)
+              ),
+              React.createElement('button', {
+                className:'check-btn'+((entry.meals[meal]||{})[item.id]?' checked':''),
+                onClick:()=>toggleMeal(meal, item.id)
+              }, (entry.meals[meal]||{})[item.id] ? '✓' : '')
+            )
+          )
+        )
+      )
+    ),
+
+    tab2==='history' && React.createElement('div', null,
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, '30-Day Avg Compliance'),
+        React.createElement('div', { style:{fontSize:32,fontWeight:800,color:'var(--accent)',letterSpacing:'-0.04em'} }, avgCompliance+'%'),
+        React.createElement('div', { className:'progress-wrap', style:{marginTop:8} },
+          React.createElement('div', { className:'progress-bar', style:{width:avgCompliance+'%'} })
+        )
+      ),
+      [...nutrition].reverse().slice(0,14).map(n => {
+        const c = Object.values(n.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
+        const pct = Math.round(c/totalItems*100);
+        return React.createElement('div', { key:n.date, className:'card card-sm', style:{marginBottom:8} },
+          React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'center'} },
+            React.createElement('div', null,
+              React.createElement('div', { style:{fontSize:13,fontWeight:600} }, dayjs(n.date).format('D MMM YYYY')),
+              React.createElement('div', { style:{fontSize:11,color:'var(--muted)',marginTop:2} },
+                [n.water&&`💧 ${n.water}L`, n.protein&&`🥩 ${n.protein}g`, n.cheat&&'🍕 Cheat', n.alcohol&&'🍺 Alcohol'].filter(Boolean).join(' · ')
+              )
+            ),
+            React.createElement('div', { style:{fontSize:16,fontWeight:700,color:pct>=80?'var(--accent3)':'var(--accent)'} }, pct+'%')
+          )
+        );
+      })
+    ),
+
+    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
+      React.createElement('div', { className:'modal' },
+        React.createElement('div', { className:'modal-handle' }),
+        React.createElement('div', { className:'modal-title' }, 'Nutrition Details'),
+        React.createElement('div', { className:'input-group' },
+          React.createElement('div', { className:'input-label' }, 'Notes'),
+          React.createElement('input', { type:'text', className:'input', placeholder:'Any notes...', value:entry.notes||'', onChange:e=>updateEntry({...entry,notes:e.target.value}) })
+        ),
+        React.createElement('button', { className:'btn btn-primary', onClick:()=>setShowForm(false) }, 'Done')
+      )
+    )
+  );
+}
+
+/* ─── Habit Tracker ─── */
+const HABITS = [
+  { section:'🌅 Morning', items:[
+    { id:'weighed', label:'Weighed myself', time:'7:00 AM' },
+    { id:'jeera', label:'Jeera water', time:'7:05 AM' },
+    { id:'almonds2', label:'Almonds & flax seeds', time:'7:10 AM' },
+  ]},
+  { section:'☀️ Day', items:[
+    { id:'lunch', label:'Lunch completed', time:'1:00 PM' },
+    { id:'water', label:'Water target (3L)', time:'All day' },
+  ]},
+  { section:'🏃 Workout', items:[
+    { id:'h_cycling', label:'Cycling', time:'6:00 PM' },
+    { id:'h_kettlebell', label:'Kettlebell', time:'6:00 PM' },
+    { id:'h_football', label:'Football', time:'6:00 PM' },
+    { id:'h_walk', label:'Walk', time:'Any time' },
+  ]},
+  { section:'🌙 Evening', items:[
+    { id:'whey2', label:'Whey protein', time:'7:30 PM' },
+    { id:'dinner2', label:'Dinner completed', time:'9:00 PM' },
+    { id:'clothes', label:'Prepared clothes for tomorrow', time:'10:30 PM' },
+    { id:'cinnamon2', label:'Cinnamon water', time:'11:00 PM' },
+  ]},
+];
+
+function HabitTracker({ habits, saveHabits }) {
+  const [viewDate, setViewDate] = useState(today());
+
+  const dayHabits = habits[viewDate] || {};
+
+  const toggle = (id) => {
+    const updated = { ...habits, [viewDate]: { ...dayHabits, [id]: !dayHabits[id] } };
+    saveHabits(updated);
+  };
+
+  const allIds = HABITS.flatMap(s=>s.items.map(i=>i.id));
+  const completed = allIds.filter(id=>dayHabits[id]).length;
+  const pct = Math.round(completed/allIds.length*100);
+
+  // Streak
+  const streak = useMemo(() => {
+    let s = 0;
+    let d = dayjs().subtract(1,'day');
+    while (true) {
+      const dk = d.format('YYYY-MM-DD');
+      const dh = habits[dk]||{};
+      const c = allIds.filter(id=>dh[id]).length;
+      if (c/allIds.length < 0.8) break;
+      s++; d = d.subtract(1,'day');
+    }
+    return s;
+  }, [habits]);
+
+  return React.createElement('div', null,
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', { className:'page-title' }, '✅ Habits'),
+      streak > 0 && React.createElement('div', { className:'streak-badge' }, '🔥 '+streak+' day streak')
+    ),
+
+    // Date nav
+    React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginBottom:12} },
+      React.createElement('button', { className:'btn btn-secondary btn-sm btn-icon', onClick:()=>setViewDate(dayjs(viewDate).subtract(1,'day').format('YYYY-MM-DD')) }, '‹'),
+      React.createElement('div', { style:{flex:1,textAlign:'center',fontWeight:600,fontSize:14} }, dayjs(viewDate).format('dddd, D MMM')),
+      React.createElement('button', { className:'btn btn-secondary btn-sm btn-icon', onClick:()=>setViewDate(dayjs(viewDate).add(1,'day').format('YYYY-MM-DD')), disabled:viewDate>=today() }, '›')
+    ),
+
+    // Progress
+    React.createElement('div', { className:'card' },
+      React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10} },
+        React.createElement('div', null,
+          React.createElement('div', { style:{fontSize:28,fontWeight:800,letterSpacing:'-0.04em'} }, pct+'%'),
+          React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, completed+' of '+allIds.length+' done')
+        ),
+        React.createElement(Ring, { pct, label:'Today', size:80, color: pct>=80?'#6bffb8':'#7c6bff' })
+      ),
+      React.createElement('div', { className:'progress-wrap' },
+        React.createElement('div', { className:'progress-bar', style:{width:pct+'%'} })
+      )
+    ),
+
+    HABITS.map(section =>
+      React.createElement('div', { key:section.section, className:'card' },
+        React.createElement('div', { className:'card-title' }, section.section),
+        section.items.map(item =>
+          React.createElement('div', { key:item.id, className:'habit-row' },
+            React.createElement('div', null,
+              React.createElement('div', { className:'habit-label' }, item.label),
+              React.createElement('div', { className:'habit-time' }, item.time)
+            ),
+            React.createElement('button', { className:'check-btn'+(dayHabits[item.id]?' checked':''), onClick:()=>toggle(item.id) },
+              dayHabits[item.id]?'✓':''
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+/* ─── Reminders ─── */
+function defaultReminders() {
+  return [
+    { id:1, time:'07:00', label:'Weigh yourself', on:true },
+    { id:2, time:'07:05', label:'Jeera water', on:true },
+    { id:3, time:'07:10', label:'Almonds and flax seeds', on:true },
+    { id:4, time:'13:00', label:'Lunch time', on:true },
+    { id:5, time:'17:00', label:'Workout preparation', on:true },
+    { id:6, time:'18:00', label:'Workout', on:true },
+    { id:7, time:'19:30', label:'Whey protein', on:true },
+    { id:8, time:'21:00', label:'Dinner', on:true },
+    { id:9, time:'22:30', label:'Prepare clothes and gear for tomorrow', on:true },
+    { id:10, time:'23:00', label:'Cinnamon water', on:true },
+  ];
+}
+
+/* ─── More Page ─── */
+function MorePage({ weights, activities, nutrition, habits, reminders, saveReminders, showToast }) {
+  const [tab2, setTab2] = useState('milestones');
+  const [notifGranted, setNotifGranted] = useState(typeof Notification !== 'undefined' && Notification.permission === 'granted');
+
+  const sorted = [...weights].sort((a,b)=>a.date.localeCompare(b.date));
+  const latestW = sorted.length ? sorted[sorted.length-1].weight : START_WEIGHT;
+  const totalLost = +(START_WEIGHT - latestW).toFixed(1);
+  const rides = activities.filter(a=>a.type==='Cycling');
+  const totalKm = rides.reduce((s,a)=>s+(a.distance||0),0);
+
+  const milestones = [
+    { icon:'🚴', name:'First ride completed', achieved: rides.length > 0, date: rides[0]?.date },
+    { icon:'🛣️', name:'First 25 km ride', achieved: rides.some(r=>(r.distance||0)>=25) },
+    { icon:'📅', name:'First week completed', achieved: sorted.length >= 7 },
+    { icon:'💪', name:'First 5 kg lost', achieved: totalLost >= 5 },
+    { icon:'🔥', name:'First 10 kg lost', achieved: totalLost >= 10 },
+    { icon:'⚡', name:'Reached 90 kg', achieved: latestW <= 90 },
+    { icon:'🌟', name:'Reached 85 kg', achieved: latestW <= 85 },
+    { icon:'🏆', name:'Reached 80 kg!', achieved: latestW <= 80 },
+  ];
+
+  const requestNotif = async () => {
+    if (typeof Notification === 'undefined') { showToast('Notifications not supported'); return; }
+    const perm = await Notification.requestPermission();
+    setNotifGranted(perm === 'granted');
+    showToast(perm === 'granted' ? '✅ Notifications enabled!' : '❌ Notifications denied');
+  };
+
+  const exportJSON = () => {
+    const data = { weights, activities, nutrition, habits };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project80_backup.json'; a.click();
+    showToast('📦 JSON exported');
+  };
+
+  const exportCSV = () => {
+    const rows = [['Date','Weight','Body Fat','Waist'], ...weights.map(w=>[w.date,w.weight,w.bodyFat||'',w.waist||''])];
+    const csv = rows.map(r=>r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project80_weight.csv'; a.click();
+    showToast('📊 CSV exported');
+  };
+
+  const importData = () => {
+    const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+    inp.onchange = e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.weights) save('weights', data.weights);
+          if (data.activities) save('activities', data.activities);
+          if (data.nutrition) save('nutrition', data.nutrition);
+          if (data.habits) save('habits', data.habits);
+          showToast('✅ Data imported! Refresh app.');
+        } catch { showToast('❌ Invalid file'); }
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  };
+
+  return React.createElement('div', null,
+    React.createElement('div', { className:'page-header' },
+      React.createElement('div', { className:'page-title' }, '⋯ More')
+    ),
+
+    React.createElement('div', { className:'tabs' },
+      ['milestones','reminders','data'].map(t=>
+        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
+          t==='milestones'?'🏆 Goals':t==='reminders'?'🔔 Alerts':'💾 Data'
+        )
+      )
+    ),
+
+    tab2 === 'milestones' && React.createElement('div', null,
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'Milestones'),
+        milestones.map((m,i) =>
+          React.createElement('div', { key:i, className:'milestone'+(m.achieved?' achieved':' pending') },
+            React.createElement('div', { className:'milestone-icon' }, m.icon),
+            React.createElement('div', { className:'milestone-info' },
+              React.createElement('div', { className:'milestone-name', style:{color: m.achieved?'var(--text)':'var(--muted)'} }, m.name),
+              React.createElement('div', { className:'milestone-date' }, m.achieved ? '✅ Achieved'+(m.date?' · '+dayjs(m.date).format('D MMM YYYY'):'') : 'Pending')
+            )
+          )
+        )
+      )
+    ),
+
+    tab2 === 'reminders' && React.createElement('div', null,
+      !notifGranted && React.createElement('div', { className:'trend-msg', style:{marginBottom:12} },
+        '🔔 Enable notifications to receive reminders on your iPhone.',
+        React.createElement('div', { style:{marginTop:8} },
+          React.createElement('button', { className:'btn btn-primary btn-sm', onClick:requestNotif }, 'Enable Notifications')
+        )
+      ),
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'Daily Reminders'),
+        reminders.map(r =>
+          React.createElement('div', { key:r.id, className:'reminder-row' },
+            React.createElement('div', { className:'reminder-time' }, r.time),
+            React.createElement('div', { className:'reminder-label' }, r.label),
+            React.createElement('button', { className:'toggle'+(r.on?' on':' off'), onClick:()=>{ saveReminders(reminders.map(x=>x.id===r.id?{...x,on:!x.on}:x)); } })
+          )
+        )
+      )
+    ),
+
+    tab2 === 'data' && React.createElement('div', null,
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'Export Data'),
+        React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:10} },
+          React.createElement('button', { className:'btn btn-secondary', onClick:exportJSON }, '📦 Export All Data (JSON)'),
+          React.createElement('button', { className:'btn btn-secondary', onClick:exportCSV }, '📊 Export Weight Log (CSV)'),
+          React.createElement('button', { className:'btn btn-secondary', onClick:importData }, '📥 Import from JSON Backup')
+        )
+      ),
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'Data Summary'),
+        React.createElement('div', { className:'grid-3' },
+          React.createElement('div', { className:'stat-tile' },
+            React.createElement('div', { className:'stat-label' }, 'Weight'),
+            React.createElement('div', { className:'stat-val' }, weights.length)
+          ),
+          React.createElement('div', { className:'stat-tile' },
+            React.createElement('div', { className:'stat-label' }, 'Activity'),
+            React.createElement('div', { className:'stat-val' }, activities.length)
+          ),
+          React.createElement('div', { className:'stat-tile' },
+            React.createElement('div', { className:'stat-label' }, 'Nutrition'),
+            React.createElement('div', { className:'stat-val' }, nutrition.length)
+          )
+        )
+      ),
+      React.createElement('div', { className:'card' },
+        React.createElement('div', { className:'card-title' }, 'About'),
+        React.createElement('div', { style:{fontSize:14,color:'var(--muted)',lineHeight:1.6} },
+          React.createElement('div', null, 'Project 80'),
+          React.createElement('div', null, 'Goal: 99.9 kg → 80 kg by Jan 1, 2027'),
+          React.createElement('div', null, 'All data stored locally on this device.'),
+          React.createElement('div', { style:{marginTop:8,fontSize:12} }, 'Install as PWA: tap Share → Add to Home Screen')
+        )
+      )
+    )
+  );
+}
+
+/* ─── Reminder Notifications ─── */
+function scheduleReminders(reminders) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  reminders.filter(r=>r.on).forEach(r => {
+    const [h,m] = r.time.split(':').map(Number);
+    const now = new Date();
+    const trigger = new Date(now);
+    trigger.setHours(h,m,0,0);
+    if (trigger <= now) trigger.setDate(trigger.getDate()+1);
+    const ms = trigger - now;
+    setTimeout(() => {
+      try { new Notification('Project 80 – '+r.label, { body:'Time: '+r.time, icon:'/icon-192.png' }); } catch {}
+    }, ms);
+  });
+}
+
+/* ─── Seed demo data on first launch ─── */
+function seedDemoData() {
+  if (load('seeded_v1', false)) return;
+  // Seed 30 days of weight entries showing a downward trend
+  const baseWeight = 99.9;
+  const weightEntries = [];
+  for (let i = 30; i >= 0; i--) {
+    const date = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
+    const trend = (30 - i) * 0.11; // ~0.11 kg/day loss trend
+    const noise = (Math.random() - 0.4) * 0.4; // slight random variation
+    const weight = +(baseWeight - trend + noise).toFixed(1);
+    weightEntries.push({ id: Date.now() + i, date, weight, bodyFat: null, waist: null });
+  }
+  save('weights', weightEntries);
+
+  // Seed some cycling activities
+  const cycleActs = [
+    { id:1001, type:'Cycling', date: dayjs().subtract(2,'day').format('YYYY-MM-DD'), duration:45, distance:18.5, speed:24.7, elevation:120, calories:380, notes:'Morning ride' },
+    { id:1002, type:'Cycling', date: dayjs().subtract(5,'day').format('YYYY-MM-DD'), duration:60, distance:25.2, speed:25.2, elevation:180, calories:510, notes:'Long ride' },
+    { id:1003, type:'Kettlebell', date: dayjs().subtract(3,'day').format('YYYY-MM-DD'), duration:30, kettlebellWeight:16, exercises:'Swings, Cleans, Press', calories:280, notes:'' },
+    { id:1004, type:'Walking', date: dayjs().subtract(1,'day').format('YYYY-MM-DD'), duration:35, steps:5200, calories:180, notes:'Evening walk' },
+  ];
+  save('activities', cycleActs);
+
+  // Seed today's habits partially
+  const todayHabits = { weighed:true, jeera:true, almonds2:true, lunch:false, water:false, h_cycling:false, h_kettlebell:false, h_football:false, h_walk:false, whey2:false, dinner2:false, clothes:false, cinnamon2:false };
+  save('habits', { [dayjs().format('YYYY-MM-DD')]: todayHabits });
+
+  save('seeded_v1', true);
+}
+
+seedDemoData();
+
+/* ─── Boot ─── */
+const savedReminders = load('reminders', defaultReminders());
+if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+  scheduleReminders(savedReminders);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
