@@ -6,1332 +6,1487 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Project 80"/>
-<meta name="description" content="Personal fitness & weight-loss dashboard. Goal: 99.9 kg → 80 kg by Jan 1, 2027."/>
+<meta name="description" content="Personal fitness dashboard. 99.9 kg → 80 kg by Jan 1 2027."/>
 <link rel="manifest" href="manifest.json"/>
 <title>Project 80</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  :root {
-    --bg:       #0a0a0f;
-    --surface:  #13131a;
-    --surface2: #1c1c27;
-    --border:   #2a2a3a;
-    --accent:   #7c6bff;
-    --accent2:  #ff6b6b;
-    --accent3:  #6bffb8;
-    --text:     #e8e8f0;
-    --muted:    #6b6b80;
-    --success:  #4caf82;
-    --warning:  #f5a623;
-    --radius:   16px;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bot: env(safe-area-inset-bottom, 0px);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body, #root { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; overflow: hidden; }
-  body { padding-top: var(--safe-top); padding-bottom: var(--safe-bot); }
-  input, select, textarea, button { font-family: inherit; color: var(--text); }
-  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
-  ::-webkit-scrollbar { display: none; }
-  .app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; position: relative; }
+:root{
+  --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c27;--border:#2a2a3a;
+  --accent:#7c6bff;--accent2:#ff6b6b;--accent3:#6bffb8;
+  --text:#e8e8f0;--muted:#6b6b80;--success:#4caf82;--warning:#f5a623;
+  --radius:16px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;overflow:hidden}
+body{padding-top:var(--safe-top)}
+input,select,textarea,button{font-family:inherit;color:var(--text)}
+input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none}
+::-webkit-scrollbar{display:none}
 
-  /* Nav */
-  .nav { display: flex; background: rgba(10,10,15,0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + var(--safe-bot)); justify-content: space-around; position: sticky; bottom: 0; z-index: 100; flex-shrink: 0; }
-  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 10px; border: none; background: none; cursor: pointer; min-width: 52px; }
-  .nav-btn span:first-child { font-size: 20px; line-height:1; }
-  .nav-btn span:last-child { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
-  .nav-btn.active span:last-child { color: var(--accent); }
-  .nav-btn.active span:first-child { filter: drop-shadow(0 0 6px var(--accent)); }
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100vh;max-width:430px;margin:0 auto}
+.page{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch}
+.page.hidden{display:none}
 
-  /* Page */
-  .page { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 8px; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
-  .page-date { font-size: 12px; color: var(--muted); font-weight: 500; }
+/* ── Nav ── */
+nav{display:flex;background:rgba(10,10,15,0.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:8px 0 calc(8px + var(--safe-bot));justify-content:space-around;flex-shrink:0;z-index:100}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 10px;border:none;background:none;cursor:pointer;min-width:52px}
+.nav-btn .nav-icon{font-size:20px;line-height:1}
+.nav-btn .nav-label{font-size:9px;font-weight:600;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+.nav-btn.active .nav-label{color:var(--accent)}
+.nav-btn.active .nav-icon{filter:drop-shadow(0 0 6px var(--accent))}
 
-  /* Cards */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
-  .card-sm { padding: 12px; }
-  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  .card-val { font-size: 36px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
-  .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+/* ── Typography ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.page-title{font-size:26px;font-weight:700;letter-spacing:-.03em}
 
-  /* Grid */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-sm{padding:12px}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
 
-  /* Stat tiles */
-  .stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 12px; }
-  .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height:1.1; }
-  .stat-unit { font-size: 11px; font-weight: 600; color: var(--muted); }
+/* ── Grid ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 12px}
+.stat-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.stat-val{font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
 
-  /* Progress bar */
-  .progress-wrap { background: var(--surface2); border-radius: 100px; overflow: hidden; height: 8px; }
-  .progress-bar { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.8s cubic-bezier(.4,0,.2,1); }
-  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 5px; }
+/* ── Progress ── */
+.progress-wrap{background:var(--surface2);border-radius:100px;overflow:hidden;height:8px}
+.progress-bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent),var(--accent3));transition:width .8s cubic-bezier(.4,0,.2,1)}
 
-  /* Buttons */
-  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 20px; border-radius: 14px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: -0.01em; transition: transform 0.15s, opacity 0.15s; -webkit-user-select: none; }
-  .btn:active { transform: scale(0.97); opacity: 0.85; }
-  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
-  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn-danger { background: rgba(255,107,107,0.15); color: var(--accent2); border: 1px solid rgba(255,107,107,0.3); }
-  .btn-sm { padding: 9px 16px; font-size: 13px; border-radius: 10px; }
-  .btn-icon { padding: 12px; border-radius: 12px; }
+/* ── Buttons ── */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;border-radius:14px;border:none;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:-.01em;transition:transform .15s,opacity .15s;-webkit-user-select:none;user-select:none;width:100%}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:rgba(255,107,107,.15);color:var(--accent2);border:1px solid rgba(255,107,107,.3)}
+.btn-sm{padding:9px 16px;font-size:13px;border-radius:10px;width:auto}
+.btn-icon{padding:12px;border-radius:12px;width:auto}
 
-  /* Input */
-  .input-group { margin-bottom: 12px; }
-  .input-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
-  .input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; font-size: 16px; color: var(--text); outline: none; transition: border-color 0.2s; -webkit-appearance: none; }
-  .input:focus { border-color: var(--accent); }
-  .input::placeholder { color: var(--muted); }
+/* ── Inputs ── */
+.input-group{margin-bottom:12px}
+.input-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;display:block}
+.input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;font-size:16px;color:var(--text);outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;display:block}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:var(--muted)}
 
-  /* Pill tabs */
-  .tabs { display: flex; background: var(--surface); border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 16px; overflow-x: auto; }
-  .tab { padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; border: none; background: none; color: var(--muted); cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-  .tab.active { background: var(--accent); color: #fff; }
+/* ── Tabs ── */
+.tabs{display:flex;background:var(--surface);border-radius:12px;padding:3px;gap:2px;margin-bottom:16px;overflow-x:auto}
+.tab{padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;border:none;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s}
+.tab.active{background:var(--accent);color:#fff}
 
-  /* Checkbox habit */
-  .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .habit-row:last-child { border-bottom: none; }
-  .habit-label { font-size: 15px; font-weight: 500; }
-  .habit-time { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .check-btn { width: 28px; height: 28px; border-radius: 8px; border: 2px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; flex-shrink: 0; }
-  .check-btn.checked { background: var(--success); border-color: var(--success); }
+/* ── Habit rows ── */
+.habit-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.habit-row:last-child{border-bottom:none}
+.habit-label{font-size:15px;font-weight:500}
+.habit-time{font-size:11px;color:var(--muted);margin-top:1px}
+.check-btn{width:28px;height:28px;border-radius:8px;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;flex-shrink:0;color:transparent}
+.check-btn.checked{background:var(--success);border-color:var(--success);color:#fff}
 
-  /* Streak badge */
-  .streak-badge { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #ff6b35, #ff6b6b); border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; }
+/* ── Badges ── */
+.streak-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#ff6b35,#ff6b6b);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff}
+.tag{display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:var(--muted);margin:2px}
 
-  /* Milestone */
-  .milestone { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .milestone:last-child { border-bottom: none; }
-  .milestone-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-  .milestone.achieved .milestone-icon { background: linear-gradient(135deg, var(--accent), var(--accent3)); }
-  .milestone.pending .milestone-icon { background: var(--surface2); }
-  .milestone-info { flex: 1; }
-  .milestone-name { font-size: 14px; font-weight: 600; }
-  .milestone-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+/* ── Ring ── */
+.ring-wrap{position:relative;margin:0 auto 16px;flex-shrink:0}
+.ring-svg{transform:rotate(-90deg);display:block}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-pct{font-size:30px;font-weight:800;letter-spacing:-.05em}
+.ring-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
-  /* Tag */
-  .tag { display: inline-flex; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--muted); margin: 2px; }
+/* ── Charts ── */
+.chart-wrap{width:100%;height:180px;margin-top:8px;position:relative}
+.chart-wrap canvas{display:block}
 
-  /* Section label */
-  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+/* ── Modal ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end}
+.modal-backdrop.hidden{display:none}
+.modal{background:var(--surface);border-radius:24px 24px 0 0;padding:20px 16px calc(20px + var(--safe-bot));width:100%;max-height:90vh;overflow-y:auto;border:1px solid var(--border)}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em}
 
-  /* Trend msg */
-  .trend-msg { background: linear-gradient(135deg, rgba(124,107,255,0.1), rgba(107,255,184,0.1)); border: 1px solid rgba(124,107,255,0.3); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--text); }
-  .trend-msg strong { color: var(--accent3); }
-
-  /* Modal */
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; }
-  .modal { background: var(--surface); border-radius: 24px 24px 0 0; padding: 20px 16px calc(20px + var(--safe-bot)); width: 100%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); }
-  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
-
-  /* Achievement */
-  .achievement { background: linear-gradient(135deg, rgba(124,107,255,0.15), rgba(107,255,184,0.15)); border: 1px solid rgba(124,107,255,0.4); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .ach-icon { font-size: 24px; }
-  .ach-name { font-size: 13px; font-weight: 600; }
-  .ach-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
-
-  /* Toast */
-  .toast { position: fixed; top: calc(var(--safe-top) + 12px); left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; font-size: 13px; font-weight: 600; z-index: 999; white-space: nowrap; backdrop-filter: blur(20px); animation: slideDown 0.3s ease; }
-  @keyframes slideDown { from { opacity:0; transform: translateX(-50%) translateY(-12px);} to { opacity:1; transform: translateX(-50%) translateY(0);} }
-
-  /* Hero ring */
-  .ring-wrap { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
-  .ring-svg { transform: rotate(-90deg); }
-  .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .ring-pct { font-size: 30px; font-weight: 800; letter-spacing: -0.05em; }
-  .ring-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-
-  /* Empty state */
-  .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
-  .empty-icon { font-size: 36px; margin-bottom: 10px; }
-  .empty-text { font-size: 14px; line-height: 1.5; }
-
-  /* Reminder */
-  .reminder-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .reminder-time { font-size: 17px; font-weight: 700; min-width: 52px; letter-spacing: -0.02em; }
-  .reminder-label { flex: 1; font-size: 14px; font-weight: 500; }
-  .toggle { width: 44px; height: 26px; border-radius: 13px; border: none; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
-  .toggle.on { background: var(--accent); }
-  .toggle.off { background: var(--border); }
-  .toggle::after { content:''; position: absolute; top:3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 0.2s; }
-  .toggle.on::after { left: 21px; }
-  .toggle.off::after { left: 3px; }
-
-  /* Recharts overrides */
-  .recharts-tooltip-wrapper { border-radius: 10px !important; }
-  .recharts-default-tooltip { background: var(--surface2) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; }
-  .recharts-cartesian-axis-tick text { fill: var(--muted) !important; font-size: 10px !important; }
-  .recharts-cartesian-grid line { stroke: var(--border) !important; }
-
-  /* Nutrition compliance */
-  .compliance-ring { width: 80px; height: 80px; }
-  .compliance-val { font-size: 18px; font-weight: 800; }
-
-  /* Section divider */
-  .divider { height: 1px; background: var(--border); margin: 12px 0; }
-
-  /* Glowing accent number */
-  .glow-num { background: linear-gradient(135deg, var(--accent), var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-
-  /* Speed dial FAB */
-  .fab { position: fixed; bottom: calc(80px + var(--safe-bot)); right: 16px; width: 52px; height: 52px; border-radius: 16px; background: var(--accent); border: none; color: #fff; font-size: 24px; cursor: pointer; box-shadow: 0 4px 20px rgba(124,107,255,0.4); z-index: 90; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
-  .fab:active { transform: scale(0.93); }
-
-  /* Cycling achievement badge */
-  .cyc-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .cyc-badge.unlocked { border-color: rgba(107,255,184,0.4); background: rgba(107,255,184,0.07); }
-  .cyc-badge-icon { font-size: 22px; }
-  .cyc-badge-name { font-size: 13px; font-weight: 600; }
-  .cyc-badge-sub { font-size: 11px; color: var(--muted); }
-
-  /* Nutrition category */
-  .nutrition-cat { background: var(--surface2); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
-  .nutrition-cat-header { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
-  .nutrition-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
-  .nutrition-item-name { font-size: 14px; font-weight: 500; }
-
-  /* Loading */
-  .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 14px; }
-
-  /* Recharts custom */
-  .chart-wrap { width:100%; height:180px; margin-top: 8px; }
+/* ── Misc ── */
+.trend-msg{background:linear-gradient(135deg,rgba(124,107,255,.1),rgba(107,255,184,.1));border:1px solid rgba(124,107,255,.3);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--text);margin-bottom:12px}
+.trend-msg strong{color:var(--accent3)}
+.section-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.glow-num{background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.empty{text-align:center;padding:32px 16px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+.empty-text{font-size:14px;line-height:1.5;white-space:pre-line}
+.milestone{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.milestone:last-child{border-bottom:none}
+.milestone-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.milestone.achieved .milestone-icon{background:linear-gradient(135deg,var(--accent),var(--accent3))}
+.milestone.pending .milestone-icon{background:var(--surface2)}
+.milestone-name{font-size:14px;font-weight:600}
+.milestone-date{font-size:11px;color:var(--muted);margin-top:2px}
+.cyc-badge{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.cyc-badge.unlocked{border-color:rgba(107,255,184,.4);background:rgba(107,255,184,.07)}
+.cyc-badge-icon{font-size:22px}
+.cyc-badge-name{font-size:13px;font-weight:600}
+.cyc-badge-sub{font-size:11px;color:var(--muted)}
+.reminder-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.reminder-row:last-child{border-bottom:none}
+.reminder-time{font-size:16px;font-weight:700;min-width:52px;letter-spacing:-.02em;flex-shrink:0}
+.reminder-label{flex:1;font-size:14px;font-weight:500}
+.toggle{width:44px;height:26px;border-radius:13px;border:none;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle.off{background:var(--border)}
+.toggle::after{content:'';position:absolute;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.on::after{left:21px}
+.toggle.off::after{left:3px}
+.toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 16px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;backdrop-filter:blur(20px);animation:slideDown .3s ease;pointer-events:none}
+@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.divider{height:1px;background:var(--border);margin:12px 0}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="app">
+  <!-- Dashboard -->
+  <div class="page" id="page-dashboard">
+    <div class="page-header">
+      <div>
+        <div style="font-size:13px;color:var(--muted);font-weight:600" id="dash-date"></div>
+        <div class="page-title">⚡ Project 80</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase">Days Left</div>
+        <div style="font-size:26px;font-weight:800;letter-spacing:-.04em;color:var(--accent)" id="dash-days"></div>
+      </div>
+    </div>
+    <!-- Progress ring card -->
+    <div class="card" style="text-align:center;padding-top:20px;padding-bottom:20px">
+      <div id="dash-ring" style="width:160px;height:160px;position:relative;margin:0 auto 16px">
+        <svg id="dash-ring-svg" width="160" height="160" style="transform:rotate(-90deg);display:block">
+          <circle cx="80" cy="80" r="72" fill="none" stroke="#1c1c27" stroke-width="10"/>
+          <circle id="dash-ring-arc" cx="80" cy="80" r="72" fill="none" stroke="#7c6bff" stroke-width="10" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-pct" id="dash-ring-pct" style="color:var(--accent)">0%</div>
+          <div class="ring-label">Progress</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin-top:4px">
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Start</div><div style="font-size:18px;font-weight:700">99.9 kg</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Current</div><div id="dash-current" style="font-size:18px;font-weight:700;color:var(--accent)">—</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Goal</div><div style="font-size:18px;font-weight:700;color:var(--accent3)">80 kg</div></div>
+      </div>
+    </div>
+    <!-- Stats grid -->
+    <div class="grid-2">
+      <div class="stat-tile"><div class="stat-label">Lost</div><div class="stat-val" id="dash-lost">—</div></div>
+      <div class="stat-tile"><div class="stat-label">Remaining</div><div class="stat-val" id="dash-remain">—</div></div>
+      <div class="stat-tile"><div class="stat-label">Wk Avg Loss</div><div class="stat-val" id="dash-wavg">—</div></div>
+      <div class="stat-tile"><div class="stat-label">Cals (7d)</div><div class="stat-val" id="dash-cals">—</div></div>
+    </div>
+    <!-- Projection -->
+    <div class="card" id="dash-proj-card">
+      <div class="card-title">🎯 Goal Projection</div>
+      <div class="trend-msg" style="margin-bottom:0" id="dash-proj-msg"></div>
+    </div>
+    <!-- Habit ring -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="card-title">Today's Habits</div>
+          <div style="font-size:28px;font-weight:800;letter-spacing:-.04em" id="dash-habit-pct">0%</div>
+          <div style="font-size:12px;color:var(--muted)" id="dash-habit-sub">0 of 0 completed</div>
+        </div>
+        <div style="width:80px;height:80px;position:relative;flex-shrink:0">
+          <svg width="80" height="80" style="transform:rotate(-90deg);display:block">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#1c1c27" stroke-width="8"/>
+            <circle id="dash-habit-arc" cx="40" cy="40" r="34" fill="none" stroke="#7c6bff" stroke-width="8" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:14px;font-weight:800;color:var(--accent)" id="dash-habit-ring-pct">0%</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px"><div class="progress-wrap"><div class="progress-bar" id="dash-habit-bar" style="width:0%"></div></div></div>
+    </div>
+    <!-- Mini weight chart -->
+    <div class="card" id="dash-chart-card">
+      <div class="card-title">Weight Trend (30d)</div>
+      <div class="chart-wrap"><canvas id="chart-dash-weight"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Weight Tracker -->
+  <div class="page hidden" id="page-weight">
+    <div class="page-header">
+      <div class="page-title">⚖️ Weight</div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-weight')">+ Log</button>
+    </div>
+    <div class="grid-2">
+      <div class="stat-tile"><div class="stat-label">Current</div><div class="stat-val" id="wt-current">—</div></div>
+      <div class="stat-tile"><div class="stat-label">Lowest</div><div class="stat-val glow-num" id="wt-lowest">—</div></div>
+      <div class="stat-tile"><div class="stat-label">7-Day Avg</div><div class="stat-val" id="wt-avg7">—</div></div>
+      <div class="stat-tile"><div class="stat-label">30-Day Avg</div><div class="stat-val" id="wt-avg30">—</div></div>
+    </div>
+    <div class="trend-msg hidden" id="wt-trend-msg"></div>
+    <div class="card hidden" id="wt-predict-card" style="background:rgba(107,255,184,.07);border-color:rgba(107,255,184,.3)">
+      <div class="card-title">🗓 Predicted Completion</div>
+      <div style="font-size:22px;font-weight:700;color:var(--accent3)" id="wt-predict-date"></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">Based on current trend</div>
+    </div>
+    <div class="card" id="wt-chart-card">
+      <div class="card-title">Weight Trend</div>
+      <div class="chart-wrap"><canvas id="chart-weight"></canvas></div>
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <div class="tag" style="color:#6bffb8">— Goal 80 kg</div>
+        <div class="tag" style="color:#f5a623">— 7-day avg</div>
+      </div>
+    </div>
+    <div class="card" id="wt-entries-card">
+      <div class="card-title">Recent Entries</div>
+      <div id="wt-entries-list"></div>
+    </div>
+    <div class="empty hidden" id="wt-empty">
+      <div class="empty-icon">⚖️</div>
+      <div class="empty-text">No weight entries yet.\nTap + Log to add today's weight.</div>
+    </div>
+  </div>
+
+  <!-- Activity Tracker -->
+  <div class="page hidden" id="page-activity">
+    <div class="page-header">
+      <div class="page-title">🚴 Activity</div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-activity')">+ Log</button>
+    </div>
+    <div class="tabs" id="act-tabs">
+      <button class="tab active" data-tab="act-log">Recent</button>
+      <button class="tab" data-tab="act-cycling">Cycling</button>
+      <button class="tab" data-tab="act-stats">Stats</button>
+    </div>
+    <div id="act-log">
+      <div id="act-log-list"></div>
+      <div class="empty hidden" id="act-empty">
+        <div class="empty-icon">🏃</div>
+        <div class="empty-text">No activities yet.\nTap + Log to add a workout.</div>
+      </div>
+    </div>
+    <div id="act-cycling" class="hidden">
+      <div class="grid-2" id="act-cyc-stats"></div>
+      <div class="section-label">Achievements</div>
+      <div id="act-cyc-badges"></div>
+    </div>
+    <div id="act-stats" class="hidden">
+      <div class="grid-2" id="act-stat-grid"></div>
+      <div class="card" id="act-cal-card">
+        <div class="card-title">Calories Burned (30d)</div>
+        <div class="chart-wrap"><canvas id="chart-activity-cals"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nutrition -->
+  <div class="page hidden" id="page-nutrition">
+    <div class="page-header">
+      <div class="page-title">🥗 Nutrition</div>
+      <button class="btn btn-secondary btn-sm" onclick="openModal('modal-nutrition-detail')">Details</button>
+    </div>
+    <div class="tabs" id="nut-tabs">
+      <button class="tab active" data-tab="nut-today">Today</button>
+      <button class="tab" data-tab="nut-history">History</button>
+    </div>
+    <div id="nut-today">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div class="card-title">Today's Compliance</div>
+            <div style="font-size:32px;font-weight:800;letter-spacing:-.04em;color:var(--accent)" id="nut-compliance-val">0%</div>
+            <div style="font-size:12px;color:var(--muted)" id="nut-compliance-sub">0 / 0 items</div>
+          </div>
+          <div style="width:80px;height:80px;position:relative;flex-shrink:0">
+            <svg width="80" height="80" style="transform:rotate(-90deg);display:block">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="#1c1c27" stroke-width="8"/>
+              <circle id="nut-ring-arc" cx="40" cy="40" r="34" fill="none" stroke="#7c6bff" stroke-width="8" stroke-linecap="round"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--accent)" id="nut-ring-pct">0%</div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:0">
+          <div style="background:var(--surface2);border-radius:10px;padding:10px 12px">
+            <div class="stat-label">💧 Water (L)</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              <button onclick="adjustWater(-0.25)" style="background:var(--border);border:none;border-radius:6px;color:var(--text);padding:4px 10px;cursor:pointer;font-size:16px">−</button>
+              <span id="nut-water-val" style="font-size:18px;font-weight:700;min-width:36px;text-align:center">0</span>
+              <button onclick="adjustWater(0.25)" style="background:var(--border);border:none;border-radius:6px;color:var(--text);padding:4px 10px;cursor:pointer;font-size:16px">+</button>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px 12px">
+            <div class="stat-label">🥩 Protein (g)</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              <button onclick="adjustProtein(-10)" style="background:var(--border);border:none;border-radius:6px;color:var(--text);padding:4px 10px;cursor:pointer;font-size:16px">−</button>
+              <span id="nut-protein-val" style="font-size:18px;font-weight:700;min-width:36px;text-align:center">0</span>
+              <button onclick="adjustProtein(10)" style="background:var(--border);border:none;border-radius:6px;color:var(--text);padding:4px 10px;cursor:pointer;font-size:16px">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <button class="btn btn-secondary" id="nut-cheat-btn" onclick="toggleNutFlag('cheat')">🍕 Cheat OFF</button>
+        <button class="btn btn-secondary" id="nut-alcohol-btn" onclick="toggleNutFlag('alcohol')">🍺 Alcohol OFF</button>
+      </div>
+      <div id="nut-meal-checklist"></div>
+    </div>
+    <div id="nut-history" class="hidden">
+      <div class="card">
+        <div class="card-title">30-Day Avg Compliance</div>
+        <div style="font-size:32px;font-weight:800;color:var(--accent);letter-spacing:-.04em" id="nut-hist-avg">—</div>
+        <div class="progress-wrap" style="margin-top:8px"><div class="progress-bar" id="nut-hist-bar" style="width:0%"></div></div>
+      </div>
+      <div id="nut-hist-list"></div>
+    </div>
+  </div>
+
+  <!-- Habits -->
+  <div class="page hidden" id="page-habits">
+    <div class="page-header">
+      <div class="page-title">✅ Habits</div>
+      <div class="streak-badge hidden" id="habit-streak-badge">🔥 0 day streak</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <button class="btn btn-secondary btn-sm btn-icon" onclick="habitNav(-1)">‹</button>
+      <div style="flex:1;text-align:center;font-weight:600;font-size:14px" id="habit-nav-date"></div>
+      <button class="btn btn-secondary btn-sm btn-icon" id="habit-nav-fwd" onclick="habitNav(1)">›</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:28px;font-weight:800;letter-spacing:-.04em" id="habit-pct">0%</div>
+          <div style="font-size:12px;color:var(--muted)" id="habit-sub">0 of 0 done</div>
+        </div>
+        <div style="width:80px;height:80px;position:relative;flex-shrink:0">
+          <svg width="80" height="80" style="transform:rotate(-90deg);display:block">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#1c1c27" stroke-width="8"/>
+            <circle id="habit-ring-arc" cx="40" cy="40" r="34" fill="none" stroke="#7c6bff" stroke-width="8" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--accent)" id="habit-ring-pct">0%</div>
+        </div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="habit-prog-bar" style="width:0%"></div></div>
+    </div>
+    <div id="habit-sections"></div>
+  </div>
+
+  <!-- More -->
+  <div class="page hidden" id="page-more">
+    <div class="page-header"><div class="page-title">⋯ More</div></div>
+    <div class="tabs" id="more-tabs">
+      <button class="tab active" data-tab="more-milestones">🏆 Goals</button>
+      <button class="tab" data-tab="more-reminders">🔔 Alerts</button>
+      <button class="tab" data-tab="more-data">💾 Data</button>
+    </div>
+    <div id="more-milestones">
+      <div class="card"><div class="card-title">Milestones</div><div id="milestone-list"></div></div>
+    </div>
+    <div id="more-reminders" class="hidden">
+      <div class="trend-msg hidden" id="notif-prompt">
+        🔔 Enable notifications to receive reminders on your iPhone.
+        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="requestNotifications()">Enable Notifications</button></div>
+      </div>
+      <div class="card"><div class="card-title">Daily Reminders</div><div id="reminder-list"></div></div>
+    </div>
+    <div id="more-data" class="hidden">
+      <div class="card">
+        <div class="card-title">Export Data</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-secondary" onclick="exportJSON()">📦 Export All Data (JSON)</button>
+          <button class="btn btn-secondary" onclick="exportCSV()">📊 Export Weight Log (CSV)</button>
+          <button class="btn btn-secondary" onclick="importData()">📥 Import from JSON Backup</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Data Summary</div>
+        <div class="grid-3" id="data-summary-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">About</div>
+        <div style="font-size:14px;color:var(--muted);line-height:1.6">
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px">Project 80</div>
+          <div>Goal: 99.9 kg → 80 kg by Jan 1, 2027</div>
+          <div>All data stored locally on this device.</div>
+          <div style="margin-top:8px;font-size:12px">Install as PWA: tap Share → Add to Home Screen</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav>
+    <button class="nav-btn active" data-page="dashboard" onclick="navigate('dashboard')">
+      <span class="nav-icon">⚡</span><span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" data-page="weight" onclick="navigate('weight')">
+      <span class="nav-icon">⚖️</span><span class="nav-label">Weight</span>
+    </button>
+    <button class="nav-btn" data-page="activity" onclick="navigate('activity')">
+      <span class="nav-icon">🚴</span><span class="nav-label">Activity</span>
+    </button>
+    <button class="nav-btn" data-page="nutrition" onclick="navigate('nutrition')">
+      <span class="nav-icon">🥗</span><span class="nav-label">Nutrition</span>
+    </button>
+    <button class="nav-btn" data-page="habits" onclick="navigate('habits')">
+      <span class="nav-icon">✅</span><span class="nav-label">Habits</span>
+    </button>
+    <button class="nav-btn" data-page="more" onclick="navigate('more')">
+      <span class="nav-icon">⋯</span><span class="nav-label">More</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Weight Modal -->
+<div class="modal-backdrop hidden" id="modal-weight">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Log Weight</div>
+    <div class="input-group"><label class="input-label">Date</label><input type="date" class="input" id="wf-date"/></div>
+    <div class="input-group"><label class="input-label">Weight (kg)</label><input type="number" step="0.1" class="input" id="wf-weight" placeholder="e.g. 95.4"/></div>
+    <div class="input-group"><label class="input-label">Body Fat % (optional)</label><input type="number" step="0.1" class="input" id="wf-bf" placeholder="e.g. 24.5"/></div>
+    <div class="input-group"><label class="input-label">Waist cm (optional)</label><input type="number" step="0.5" class="input" id="wf-waist" placeholder="e.g. 92.0"/></div>
+    <button class="btn btn-primary" onclick="saveWeight()" style="margin-bottom:8px">Save Entry</button>
+    <button class="btn btn-secondary" onclick="closeModal('modal-weight')">Cancel</button>
+  </div>
+</div>
+
+<!-- Activity Modal -->
+<div class="modal-backdrop hidden" id="modal-activity">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Log Activity</div>
+    <div class="tabs" id="act-type-tabs" style="margin-bottom:12px">
+      <button class="tab active" data-acttype="Cycling" onclick="setActType('Cycling')">🚴 Cycling</button>
+      <button class="tab" data-acttype="Kettlebell" onclick="setActType('Kettlebell')">🏋️ Kettlebell</button>
+      <button class="tab" data-acttype="Football" onclick="setActType('Football')">⚽ Football</button>
+      <button class="tab" data-acttype="Gym" onclick="setActType('Gym')">💪 Gym</button>
+      <button class="tab" data-acttype="Walking" onclick="setActType('Walking')">🚶 Walking</button>
+    </div>
+    <div class="input-group"><label class="input-label">Date</label><input type="date" class="input" id="af-date"/></div>
+    <div class="input-group"><label class="input-label">Duration (min)</label><input type="number" class="input" id="af-duration" placeholder="e.g. 45"/></div>
+    <div class="input-group"><label class="input-label">Calories Burned</label><input type="number" class="input" id="af-calories" placeholder="e.g. 350"/></div>
+    <div id="af-cycling-fields">
+      <div class="input-group"><label class="input-label">Distance (km)</label><input type="number" step="0.1" class="input" id="af-distance" placeholder="e.g. 25"/></div>
+      <div class="input-group"><label class="input-label">Avg Speed (km/h)</label><input type="number" step="0.1" class="input" id="af-speed" placeholder="e.g. 22"/></div>
+      <div class="input-group"><label class="input-label">Elevation Gain (m)</label><input type="number" class="input" id="af-elevation" placeholder="e.g. 180"/></div>
+    </div>
+    <div id="af-kb-fields" class="hidden">
+      <div class="input-group"><label class="input-label">Kettlebell Weight (kg)</label><input type="number" class="input" id="af-kbweight" placeholder="e.g. 16"/></div>
+      <div class="input-group"><label class="input-label">Exercises Performed</label><input type="text" class="input" id="af-exercises" placeholder="e.g. Swings, Cleans, Press"/></div>
+    </div>
+    <div id="af-gym-fields" class="hidden">
+      <div class="input-group"><label class="input-label">Muscle Groups</label><input type="text" class="input" id="af-muscles" placeholder="e.g. Chest, Back, Shoulders"/></div>
+    </div>
+    <div id="af-walk-fields" class="hidden">
+      <div class="input-group"><label class="input-label">Steps</label><input type="number" class="input" id="af-steps" placeholder="e.g. 8500"/></div>
+    </div>
+    <div class="input-group"><label class="input-label">Notes (optional)</label><input type="text" class="input" id="af-notes" placeholder="Any notes..."/></div>
+    <button class="btn btn-primary" onclick="saveActivity()" style="margin-bottom:8px">Save Activity</button>
+    <button class="btn btn-secondary" onclick="closeModal('modal-activity')">Cancel</button>
+  </div>
+</div>
+
+<!-- Nutrition detail modal -->
+<div class="modal-backdrop hidden" id="modal-nutrition-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nutrition Notes</div>
+    <div class="input-group"><label class="input-label">Notes</label><input type="text" class="input" id="nf-notes" placeholder="Any notes..."/></div>
+    <button class="btn btn-primary" onclick="saveNutNotes()">Done</button>
+  </div>
+</div>
 
 <script>
-const { useState, useEffect, useCallback, useMemo, useRef } = React;
-const { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, BarChart, Bar, AreaChart, Area } = Recharts;
-
-/* ─── Constants ─── */
+// ── Constants ──────────────────────────────────────────────────
 const GOAL_WEIGHT = 80;
 const START_WEIGHT = 99.9;
-const GOAL_DATE = dayjs('2027-01-01');
-const today = () => dayjs().format('YYYY-MM-DD');
+const GOAL_DATE = new Date('2027-01-01');
+const CIRC_160 = 2 * Math.PI * 72;  // ring r=72 for size 160
+const CIRC_80  = 2 * Math.PI * 34;  // ring r=34 for size 80
 
-/* ─── Storage helpers ─── */
+// ── Storage ───────────────────────────────────────────────────
 const load = (k, d) => { try { const v = localStorage.getItem('p80_'+k); return v ? JSON.parse(v) : d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem('p80_'+k, JSON.stringify(v)); } catch {} };
 
-/* ─── Toast ─── */
-let toastTimer;
-function Toast({ msg, clear }) {
-  useEffect(() => { toastTimer = setTimeout(clear, 2500); return () => clearTimeout(toastTimer); }, []);
-  if (!msg) return null;
-  return React.createElement('div', { className: 'toast' }, msg);
+// ── State ──────────────────────────────────────────────────────
+let weights    = load('weights', []);
+let activities = load('activities', []);
+let nutrition  = load('nutrition', []);
+let habits     = load('habits', {});
+let reminders  = load('reminders', defaultReminders());
+let currentPage = 'dashboard';
+let currentActType = 'Cycling';
+let habitViewDate = todayStr();
+let currentActSubTab = 'act-log';
+let currentNutSubTab = 'nut-today';
+let currentMoreSubTab = 'more-milestones';
+
+// ── Chart instances ────────────────────────────────────────────
+const charts = {};
+
+// ── Helpers ───────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fmtDate(s, fmt) {
+  if (!s) return '';
+  const [y,m,d] = s.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  if (fmt === 'D MMM') return d+' '+months[m-1];
+  if (fmt === 'D MMM YYYY') return d+' '+months[m-1]+' '+y;
+  if (fmt === 'D/M') return d+'/'+m;
+  if (fmt === 'dddd, D MMMM') return days[dt.getDay()]+', '+d+' '+['January','February','March','April','May','June','July','August','September','October','November','December'][m-1];
+  return s;
+}
+function daysUntil(date) {
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.ceil((date - now) / 86400000);
+}
+function sortedWeights() {
+  return [...weights].sort((a,b) => a.date < b.date ? -1 : 1);
+}
+function latestWeight() {
+  const s = sortedWeights();
+  return s.length ? s[s.length-1].weight : START_WEIGHT;
+}
+function setRingArc(el, pct, circ) {
+  const offset = circ - (Math.min(Math.max(pct,0),100) / 100) * circ;
+  el.style.strokeDasharray = circ;
+  el.style.strokeDashoffset = offset;
+}
+function showToast(msg) {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('hidden');
+  // Pre-fill dates
+  if (id === 'modal-weight') document.getElementById('wf-date').value = todayStr();
+  if (id === 'modal-activity') document.getElementById('af-date').value = todayStr();
+}
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+// Close modal on backdrop click
+document.querySelectorAll('.modal-backdrop').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.add('hidden'); });
+});
+
+// ── Navigation ────────────────────────────────────────────────
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.remove('hidden');
+  document.querySelector('.nav-btn[data-page="'+page+'"]').classList.add('active');
+  currentPage = page;
+  renderPage(page);
 }
 
-/* ─── Ring ─── */
-function Ring({ pct, label, color = '#7c6bff', size = 160 }) {
-  const r = (size - 16) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (pct / 100) * circ;
-  return React.createElement('div', { className: 'ring-wrap', style: { width: size, height: size } },
-    React.createElement('svg', { className: 'ring-svg', width: size, height: size, viewBox: `0 0 ${size} ${size}` },
-      React.createElement('circle', { cx: size/2, cy: size/2, r, fill:'none', stroke:'#1c1c27', strokeWidth:10 }),
-      React.createElement('circle', { cx: size/2, cy: size/2, r, fill:'none', stroke: color, strokeWidth:10,
-        strokeLinecap:'round', strokeDasharray: circ, strokeDashoffset: offset, style:{transition:'stroke-dashoffset 1s ease'} })
-    ),
-    React.createElement('div', { className:'ring-center' },
-      React.createElement('div', { className:'ring-pct', style:{color} }, Math.round(pct)+'%'),
-      React.createElement('div', { className:'ring-label' }, label)
-    )
-  );
+function renderPage(page) {
+  if (page === 'dashboard')  renderDashboard();
+  if (page === 'weight')     renderWeight();
+  if (page === 'activity')   renderActivity();
+  if (page === 'nutrition')  renderNutrition();
+  if (page === 'habits')     renderHabits();
+  if (page === 'more')       renderMore();
 }
 
-/* ─── App ─── */
-function App() {
-  const [tab, setTab] = useState('dashboard');
-  const [toast, setToast] = useState('');
-  const showToast = msg => { setToast(msg); };
-
-  // Global data state
-  const [weights, setWeights] = useState(() => load('weights', []));
-  const [activities, setActivities] = useState(() => load('activities', []));
-  const [nutrition, setNutrition] = useState(() => load('nutrition', []));
-  const [habits, setHabits] = useState(() => load('habits', {}));
-  const [reminders, setReminders] = useState(() => load('reminders', defaultReminders()));
-
-  const saveWeights = w => { setWeights(w); save('weights', w); };
-  const saveActivities = a => { setActivities(a); save('activities', a); };
-  const saveNutrition = n => { setNutrition(n); save('nutrition', n); };
-  const saveHabits = h => { setHabits(h); save('habits', h); };
-  const saveReminders = r => { setReminders(r); save('reminders', r); };
-
-  const tabs = [
-    { id:'dashboard', icon:'⚡', label:'Home' },
-    { id:'weight',    icon:'⚖️',  label:'Weight' },
-    { id:'activity',  icon:'🚴', label:'Activity' },
-    { id:'nutrition', icon:'🥗',  label:'Nutrition' },
-    { id:'habits',    icon:'✅',  label:'Habits' },
-    { id:'more',      icon:'⋯',   label:'More' },
-  ];
-
-  const latestWeight = useMemo(() => {
-    if (!weights.length) return START_WEIGHT;
-    const sorted = [...weights].sort((a,b) => b.date.localeCompare(a.date));
-    return sorted[0].weight;
-  }, [weights]);
-
-  return React.createElement('div', { className:'app' },
-    toast ? React.createElement(Toast, { msg:toast, clear: () => setToast('') }) : null,
-    React.createElement('div', { className:'page', key:tab },
-      tab === 'dashboard'  && React.createElement(Dashboard, { weights, activities, habits, latestWeight }),
-      tab === 'weight'     && React.createElement(WeightTracker, { weights, saveWeights, showToast }),
-      tab === 'activity'   && React.createElement(ActivityTracker, { activities, saveActivities, showToast }),
-      tab === 'nutrition'  && React.createElement(NutritionTracker, { nutrition, saveNutrition, showToast }),
-      tab === 'habits'     && React.createElement(HabitTracker, { habits, saveHabits }),
-      tab === 'more'       && React.createElement(MorePage, { weights, activities, nutrition, habits, reminders, saveReminders, showToast }),
-    ),
-    React.createElement('nav', { className:'nav' },
-      tabs.map(t => React.createElement('button', {
-        key: t.id, className: 'nav-btn' + (tab===t.id?' active':''),
-        onClick: () => setTab(t.id)
-      },
-        React.createElement('span', null, t.icon),
-        React.createElement('span', null, t.label)
-      ))
-    )
-  );
-}
-
-/* ─── Dashboard ─── */
-function Dashboard({ weights, activities, habits, latestWeight }) {
-  const sorted = useMemo(() => [...weights].sort((a,b) => a.date.localeCompare(b.date)), [weights]);
-  const daysRemaining = GOAL_DATE.diff(dayjs(), 'day');
-  const totalLost = +(START_WEIGHT - latestWeight).toFixed(1);
-  const remaining = +(latestWeight - GOAL_WEIGHT).toFixed(1);
-  const pct = +((totalLost / (START_WEIGHT - GOAL_WEIGHT)) * 100).toFixed(1);
-
-  const weeklyAvg = useMemo(() => {
-    if (sorted.length < 2) return 0;
-    const recent = sorted.slice(-14);
-    if (recent.length < 2) return 0;
-    const firstW = recent[0].weight, lastW = recent[recent.length-1].weight;
-    const days = dayjs(recent[recent.length-1].date).diff(dayjs(recent[0].date), 'day') || 1;
-    return +((firstW - lastW) / days * 7).toFixed(2);
-  }, [sorted]);
-
-  const projectedWeight = useMemo(() => {
-    if (weeklyAvg <= 0) return null;
-    const kgPerDay = weeklyAvg / 7;
-    return +(latestWeight - kgPerDay * daysRemaining).toFixed(1);
-  }, [weeklyAvg, latestWeight, daysRemaining]);
-
-  const todayHabits = habits[today()] || {};
-  const habitKeys = Object.keys(todayHabits);
-  const completed = habitKeys.filter(k => todayHabits[k]).length;
-  const habitPct = habitKeys.length ? Math.round(completed / habitKeys.length * 100) : 0;
-
-  const totalCals = useMemo(() => activities.filter(a => {
-    return dayjs(a.date).isAfter(dayjs().subtract(7,'day'));
-  }).reduce((s,a) => s + (a.calories||0), 0), [activities]);
-
-  return React.createElement('div', null,
-    // Header
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', null,
-        React.createElement('div', { style:{fontSize:13,color:'var(--muted)',fontWeight:600} }, dayjs().format('dddd, D MMMM')),
-        React.createElement('div', { className:'page-title' }, '⚡ Project 80')
-      ),
-      React.createElement('div', { style:{textAlign:'right'} },
-        React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase'} }, 'Days Left'),
-        React.createElement('div', { style:{fontSize:26,fontWeight:800,letterSpacing:'-0.04em',color:'var(--accent)'} }, daysRemaining)
-      )
-    ),
-
-    // Progress ring
-    React.createElement('div', { className:'card', style:{textAlign:'center',paddingTop:20,paddingBottom:20} },
-      React.createElement(Ring, { pct: Math.min(pct,100), label:'Progress' }),
-      React.createElement('div', { style:{display:'flex',justifyContent:'space-around',marginTop:12} },
-        React.createElement('div', null,
-          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Start'),
-          React.createElement('div', { style:{fontSize:18,fontWeight:700} }, START_WEIGHT+' kg')
-        ),
-        React.createElement('div', null,
-          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Current'),
-          React.createElement('div', { style:{fontSize:18,fontWeight:700,color:'var(--accent)'} }, latestWeight+' kg')
-        ),
-        React.createElement('div', null,
-          React.createElement('div', { style:{fontSize:11,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'} }, 'Goal'),
-          React.createElement('div', { style:{fontSize:18,fontWeight:700,color:'var(--accent3)'} }, GOAL_WEIGHT+' kg')
-        )
-      )
-    ),
-
-    // Stats grid
-    React.createElement('div', { className:'grid-2' },
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Lost'),
-        React.createElement('div', { className:'stat-val' }, totalLost > 0 ? React.createElement('span', { className:'glow-num' }, totalLost+' kg') : '0 kg')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Remaining'),
-        React.createElement('div', { className:'stat-val' }, remaining+' kg')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Wk Avg Loss'),
-        React.createElement('div', { className:'stat-val' }, weeklyAvg > 0 ? weeklyAvg+' kg' : '—')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Cals (7d)'),
-        React.createElement('div', { className:'stat-val' }, totalCals ? totalCals.toLocaleString() : '—')
-      )
-    ),
-
-    // Projection card
-    projectedWeight !== null && React.createElement('div', { className:'card' },
-      React.createElement('div', { className:'card-title' }, '🎯 Goal Projection'),
-      React.createElement('div', { className:'trend-msg' },
-        projectedWeight <= GOAL_WEIGHT
-          ? React.createElement('span', null, '🟢 At your current pace you are projected to reach ', React.createElement('strong', null, projectedWeight+' kg'), ' by Jan 1, 2027. You\'re on track!')
-          : React.createElement('span', null, '📊 At your current pace you are projected to reach ', React.createElement('strong', null, projectedWeight+' kg'), '. Increase average weekly loss by ', React.createElement('strong', null, +((projectedWeight - GOAL_WEIGHT) / (daysRemaining/7)).toFixed(2)+' kg/wk'), ' to reach 80 kg.')
-      )
-    ),
-
-    // Habit compliance
-    React.createElement('div', { className:'card' },
-      React.createElement('div', { style:{display:'flex',alignItems:'center',justifyContent:'space-between'} },
-        React.createElement('div', null,
-          React.createElement('div', { className:'card-title' }, "Today's Habits"),
-          React.createElement('div', { style:{fontSize:28,fontWeight:800,letterSpacing:'-0.04em'} }, habitPct+'%'),
-          React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, completed+' of '+habitKeys.length+' completed')
-        ),
-        React.createElement(Ring, { pct: habitPct, label:'Done', size:80, color: habitPct >= 80 ? '#6bffb8' : '#7c6bff' })
-      ),
-      React.createElement('div', { style:{marginTop:12} },
-        React.createElement('div', { className:'progress-wrap' },
-          React.createElement('div', { className:'progress-bar', style:{width:habitPct+'%'} })
-        )
-      )
-    ),
-
-    // Mini weight chart
-    sorted.length > 1 && React.createElement('div', { className:'card' },
-      React.createElement('div', { className:'card-title' }, 'Weight Trend'),
-      React.createElement('div', { className:'chart-wrap' },
-        React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
-          React.createElement(AreaChart, { data: sorted.slice(-30).map(w=>({...w,w:w.weight})) },
-            React.createElement('defs', null,
-              React.createElement('linearGradient', { id:'wg', x1:0,y1:0,x2:0,y2:1 },
-                React.createElement('stop', { offset:'5%', stopColor:'#7c6bff', stopOpacity:0.3 }),
-                React.createElement('stop', { offset:'95%', stopColor:'#7c6bff', stopOpacity:0 })
-              )
-            ),
-            React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
-            React.createElement(XAxis, { dataKey:'date', tickFormatter: d=>dayjs(d).format('D/M'), tick:{fontSize:9} }),
-            React.createElement(YAxis, { domain:['dataMin - 0.5','dataMax + 0.5'], tick:{fontSize:9} }),
-            React.createElement(Tooltip, { formatter: v=>[v+' kg','Weight'], labelFormatter: d=>dayjs(d).format('D MMM') }),
-            React.createElement(ReferenceLine, { y:GOAL_WEIGHT, stroke:'#6bffb8', strokeDasharray:'4 4', label:{ value:'Goal', fill:'#6bffb8', fontSize:10 } }),
-            React.createElement(Area, { type:'monotone', dataKey:'w', stroke:'#7c6bff', fill:'url(#wg)', strokeWidth:2, dot:false })
-          )
-        )
-      )
-    )
-  );
-}
-
-/* ─── Weight Tracker ─── */
-function WeightTracker({ weights, saveWeights, showToast }) {
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date: today(), weight:'', bodyFat:'', waist:'' });
-
-  const sorted = useMemo(() => [...weights].sort((a,b) => a.date.localeCompare(b.date)), [weights]);
-
-  const avg7 = useMemo(() => {
-    const last7 = sorted.slice(-7);
-    if (!last7.length) return null;
-    return +(last7.reduce((s,w)=>s+w.weight,0)/last7.length).toFixed(2);
-  }, [sorted]);
-
-  const avg30 = useMemo(() => {
-    const last30 = sorted.slice(-30);
-    if (!last30.length) return null;
-    return +(last30.reduce((s,w)=>s+w.weight,0)/last30.length).toFixed(2);
-  }, [sorted]);
-
-  const lowest = useMemo(() => sorted.length ? Math.min(...sorted.map(w=>w.weight)) : null, [sorted]);
-
-  const latest = sorted.length ? sorted[sorted.length-1].weight : null;
-  const prevLowest = lowest;
-
-  const trendMsg = useMemo(() => {
-    if (sorted.length < 4) return null;
-    const last4 = sorted.slice(-4);
-    const allUp = last4.every((w,i)=>i===0||w.weight>last4[i-1].weight);
-    if (!allUp) return null;
-    const fromLowest = +(latest - prevLowest).toFixed(1);
-    const trend7 = avg7 && sorted.length >= 8 ? +(sorted[sorted.length-8].weight - avg7).toFixed(1) : 0;
-    return `Weight is up ${fromLowest} kg from lowest point. ${trend7 > 0 ? 'Current 7-day trend remains downward.' : 'Monitor trend over coming days.'} Continue current plan.`;
-  }, [sorted, latest, prevLowest, avg7]);
-
-  const predictedDate = useMemo(() => {
-    if (sorted.length < 2 || !latest) return null;
-    const first = sorted[0], last = sorted[sorted.length-1];
-    const days = dayjs(last.date).diff(dayjs(first.date),'day') || 1;
-    const ratePerDay = (first.weight - last.weight) / days;
-    if (ratePerDay <= 0) return null;
-    const daysLeft = (latest - GOAL_WEIGHT) / ratePerDay;
-    return dayjs().add(daysLeft,'day').format('D MMM YYYY');
-  }, [sorted, latest]);
-
-  const addEntry = () => {
-    if (!form.weight) { showToast('Enter your weight'); return; }
-    const entry = { ...form, weight: +form.weight, bodyFat: form.bodyFat ? +form.bodyFat : null, waist: form.waist ? +form.waist : null, id: Date.now() };
-    const existing = weights.filter(w => w.date !== form.date);
-    saveWeights([...existing, entry]);
-    setShowForm(false);
-    setForm({ date: today(), weight:'', bodyFat:'', waist:'' });
-    showToast('✅ Weight logged');
-  };
-
-  return React.createElement('div', null,
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', { className:'page-title' }, '⚖️ Weight'),
-      React.createElement('button', { className:'btn btn-primary btn-sm', style:{width:'auto'}, onClick:()=>setShowForm(true) }, '+ Log')
-    ),
-
-    // Stats
-    React.createElement('div', { className:'grid-2' },
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Current'),
-        React.createElement('div', { className:'stat-val' }, latest ? latest+' kg' : '—')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, 'Lowest'),
-        React.createElement('div', { className:'stat-val glow-num' }, lowest ? lowest+' kg' : '—')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, '7-Day Avg'),
-        React.createElement('div', { className:'stat-val' }, avg7 ? avg7+' kg' : '—')
-      ),
-      React.createElement('div', { className:'stat-tile' },
-        React.createElement('div', { className:'stat-label' }, '30-Day Avg'),
-        React.createElement('div', { className:'stat-val' }, avg30 ? avg30+' kg' : '—')
-      )
-    ),
-
-    trendMsg && React.createElement('div', { className:'trend-msg', style:{marginBottom:12} }, '📊 '+trendMsg),
-
-    predictedDate && React.createElement('div', { className:'card', style:{background:'rgba(107,255,184,0.07)',borderColor:'rgba(107,255,184,0.3)'} },
-      React.createElement('div', { className:'card-title' }, '🗓 Predicted Completion'),
-      React.createElement('div', { style:{fontSize:22,fontWeight:700,color:'var(--accent3)'} }, predictedDate),
-      React.createElement('div', { className:'card-sub' }, 'Based on current trend')
-    ),
-
-    // Chart
-    sorted.length > 1 && React.createElement('div', { className:'card' },
-      React.createElement('div', { className:'card-title' }, 'Weight Trend'),
-      React.createElement('div', { className:'chart-wrap' },
-        React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
-          React.createElement(AreaChart, { data: sorted.map(w=>({...w,w:w.weight})) },
-            React.createElement('defs', null,
-              React.createElement('linearGradient', { id:'wg2', x1:0,y1:0,x2:0,y2:1 },
-                React.createElement('stop', { offset:'5%', stopColor:'#7c6bff', stopOpacity:0.3 }),
-                React.createElement('stop', { offset:'95%', stopColor:'#7c6bff', stopOpacity:0 })
-              )
-            ),
-            React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
-            React.createElement(XAxis, { dataKey:'date', tickFormatter: d=>dayjs(d).format('D/M'), tick:{fontSize:9} }),
-            React.createElement(YAxis, { domain:['dataMin - 1','dataMax + 1'], tick:{fontSize:9}, width:38 }),
-            React.createElement(Tooltip, { formatter: v=>[v+' kg','Weight'], labelFormatter: d=>dayjs(d).format('D MMM') }),
-            React.createElement(ReferenceLine, { y:GOAL_WEIGHT, stroke:'#6bffb8', strokeDasharray:'4 4' }),
-            React.createElement(ReferenceLine, { y:avg7||0, stroke:'#f5a623', strokeDasharray:'3 3' }),
-            React.createElement(Area, { type:'monotone', dataKey:'w', stroke:'#7c6bff', fill:'url(#wg2)', strokeWidth:2, dot:{r:3,fill:'#7c6bff'} })
-          )
-        )
-      ),
-      React.createElement('div', { style:{display:'flex',gap:12,marginTop:8,flexWrap:'wrap'} },
-        React.createElement('div', { className:'tag', style:{color:'#6bffb8'} }, '— Goal 80 kg'),
-        React.createElement('div', { className:'tag', style:{color:'#f5a623'} }, '— 7-day avg')
-      )
-    ),
-
-    // Log entries
-    sorted.length > 0 && React.createElement('div', { className:'card' },
-      React.createElement('div', { className:'card-title' }, 'Recent Entries'),
-      [...sorted].reverse().slice(0,10).map(w =>
-        React.createElement('div', { key:w.id||w.date, className:'habit-row' },
-          React.createElement('div', null,
-            React.createElement('div', { className:'habit-label' }, w.weight+' kg'),
-            React.createElement('div', { className:'habit-time' }, dayjs(w.date).format('D MMM YYYY') + (w.bodyFat?' · '+w.bodyFat+'% BF':'') + (w.waist?' · '+w.waist+' cm':''))
-          ),
-          React.createElement('button', { onClick:()=>{ saveWeights(weights.filter(x=>(x.id||x.date)!==(w.id||w.date))); showToast('Deleted'); }, className:'btn btn-danger btn-sm', style:{padding:'6px 10px'} }, '✕')
-        )
-      )
-    ),
-
-    !sorted.length && React.createElement('div', { className:'empty' },
-      React.createElement('div', { className:'empty-icon' }, '⚖️'),
-      React.createElement('div', { className:'empty-text' }, 'No weight entries yet.\nTap + Log to add today\'s weight.')
-    ),
-
-    // Form modal
-    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
-      React.createElement('div', { className:'modal' },
-        React.createElement('div', { className:'modal-handle' }),
-        React.createElement('div', { className:'modal-title' }, 'Log Weight'),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Date'),
-          React.createElement('input', { type:'date', className:'input', value:form.date, onChange:e=>setForm({...form,date:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Weight (kg)'),
-          React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 95.4', value:form.weight, onChange:e=>setForm({...form,weight:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Body Fat % (optional)'),
-          React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 24.5', value:form.bodyFat, onChange:e=>setForm({...form,bodyFat:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Waist cm (optional)'),
-          React.createElement('input', { type:'number', step:'0.5', className:'input', placeholder:'e.g. 92.0', value:form.waist, onChange:e=>setForm({...form,waist:e.target.value}) })
-        ),
-        React.createElement('button', { className:'btn btn-primary', onClick:addEntry }, 'Save Entry'),
-        React.createElement('div', { style:{height:8} }),
-        React.createElement('button', { className:'btn btn-secondary', onClick:()=>setShowForm(false) }, 'Cancel')
-      )
-    )
-  );
-}
-
-/* ─── Activity Tracker ─── */
-const ACTIVITY_TYPES = ['Cycling','Kettlebell','Football','Gym','Walking'];
-
-function ActivityTracker({ activities, saveActivities, showToast }) {
-  const [tab2, setTab2] = useState('log');
-  const [showForm, setShowForm] = useState(false);
-  const [actType, setActType] = useState('Cycling');
-  const [form, setForm] = useState({
-    date: today(), duration:'', calories:'', distance:'', speed:'', elevation:'',
-    kettlebellWeight:'', exercises:'', muscleGroups:'', steps:'', notes:''
-  });
-
-  const addActivity = () => {
-    if (!form.duration) { showToast('Enter duration'); return; }
-    const entry = { ...form, type: actType, duration:+form.duration, calories: form.calories ? +form.calories : 0,
-      distance: form.distance ? +form.distance : 0, id: Date.now() };
-    saveActivities([...activities, entry]);
-    setShowForm(false);
-    setForm({ date:today(), duration:'', calories:'', distance:'', speed:'', elevation:'', kettlebellWeight:'', exercises:'', muscleGroups:'', steps:'', notes:'' });
-    showToast('✅ Activity logged');
-  };
-
-  const weekActs = activities.filter(a => dayjs(a.date).isAfter(dayjs().subtract(7,'day')));
-  const monthActs = activities.filter(a => dayjs(a.date).isAfter(dayjs().subtract(30,'day')));
-  const totalCalsWeek = weekActs.reduce((s,a)=>s+(a.calories||0),0);
-  const totalCalsMonth = monthActs.reduce((s,a)=>s+(a.calories||0),0);
-
-  // Cycling stats
-  const rides = activities.filter(a=>a.type==='Cycling');
-  const totalKm = rides.reduce((s,a)=>s+(a.distance||0),0);
-  const totalElev = rides.reduce((s,a)=>s+(+a.elevation||0),0);
-  const longestRide = rides.length ? Math.max(...rides.map(a=>a.distance||0)) : 0;
-  const fastestSpeed = rides.length ? Math.max(...rides.map(a=>+a.speed||0)) : 0;
-  const cycBadges = [
-    { km:100, icon:'🥉', name:'First 100 km', desc:'Bronze milestone' },
-    { km:250, icon:'🥈', name:'First 250 km', desc:'Silver milestone' },
-    { km:500, icon:'🥇', name:'First 500 km', desc:'Gold milestone' },
-    { km:1000, icon:'🏆', name:'First 1000 km', desc:'Legend milestone' },
-  ];
-
-  const actsByDay = useMemo(() => {
-    const map = {};
-    monthActs.forEach(a => {
-      const d = a.date;
-      if (!map[d]) map[d] = 0;
-      map[d] += a.calories||0;
+// ── Sub-tab switching ─────────────────────────────────────────
+function setupTabs(containerEl, onSwitch) {
+  containerEl.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      containerEl.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      onSwitch(btn.dataset.tab || btn.dataset.acttype);
     });
-    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,cals])=>({date:dayjs(date).format('D/M'),cals}));
-  }, [activities]);
-
-  return React.createElement('div', null,
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', { className:'page-title' }, '🚴 Activity'),
-      React.createElement('button', { className:'btn btn-primary btn-sm', style:{width:'auto'}, onClick:()=>setShowForm(true) }, '+ Log')
-    ),
-
-    React.createElement('div', { className:'tabs' },
-      ['log','cycling','stats'].map(t =>
-        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
-          t==='log'?'Recent':t==='cycling'?'Cycling':'Stats'
-        )
-      )
-    ),
-
-    tab2 === 'stats' && React.createElement('div', null,
-      React.createElement('div', { className:'grid-2' },
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Cals (7d)'),
-          React.createElement('div', { className:'stat-val glow-num' }, totalCalsWeek.toLocaleString())
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Cals (30d)'),
-          React.createElement('div', { className:'stat-val' }, totalCalsMonth.toLocaleString())
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Sessions (7d)'),
-          React.createElement('div', { className:'stat-val' }, weekActs.length)
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Sessions (30d)'),
-          React.createElement('div', { className:'stat-val' }, monthActs.length)
-        )
-      ),
-      actsByDay.length > 1 && React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'Calories Burned (30d)'),
-        React.createElement('div', { className:'chart-wrap' },
-          React.createElement(ResponsiveContainer, { width:'100%', height:'100%' },
-            React.createElement(BarChart, { data: actsByDay },
-              React.createElement(CartesianGrid, { strokeDasharray:'3 3', vertical:false }),
-              React.createElement(XAxis, { dataKey:'date', tick:{fontSize:9} }),
-              React.createElement(YAxis, { tick:{fontSize:9}, width:36 }),
-              React.createElement(Tooltip, { formatter:v=>[v+' kcal','Calories'] }),
-              React.createElement(Bar, { dataKey:'cals', fill:'#7c6bff', radius:[4,4,0,0] })
-            )
-          )
-        )
-      )
-    ),
-
-    tab2 === 'cycling' && React.createElement('div', null,
-      React.createElement('div', { className:'grid-2' },
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Total Rides'),
-          React.createElement('div', { className:'stat-val glow-num' }, rides.length)
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Total km'),
-          React.createElement('div', { className:'stat-val' }, totalKm.toFixed(1))
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Longest'),
-          React.createElement('div', { className:'stat-val' }, longestRide+'km')
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Best Speed'),
-          React.createElement('div', { className:'stat-val' }, fastestSpeed ? fastestSpeed+' km/h' : '—')
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Elevation'),
-          React.createElement('div', { className:'stat-val' }, totalElev.toFixed(0)+'m')
-        ),
-        React.createElement('div', { className:'stat-tile' },
-          React.createElement('div', { className:'stat-label' }, 'Cals Burned'),
-          React.createElement('div', { className:'stat-val' }, rides.reduce((s,a)=>s+(a.calories||0),0).toLocaleString())
-        )
-      ),
-      React.createElement('div', { className:'section-label' }, 'Achievements'),
-      cycBadges.map(b =>
-        React.createElement('div', { key:b.km, className:'cyc-badge'+(totalKm>=b.km?' unlocked':'') },
-          React.createElement('div', { className:'cyc-badge-icon' }, totalKm>=b.km ? b.icon : '🔒'),
-          React.createElement('div', null,
-            React.createElement('div', { className:'cyc-badge-name' }, b.name),
-            React.createElement('div', { className:'cyc-badge-sub' }, totalKm>=b.km ? 'Unlocked! ' : `${totalKm.toFixed(1)} / ${b.km} km`)
-          )
-        )
-      )
-    ),
-
-    tab2 === 'log' && React.createElement('div', null,
-      [...activities].reverse().slice(0,20).map(a =>
-        React.createElement('div', { key:a.id, className:'card card-sm', style:{marginBottom:8} },
-          React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'} },
-            React.createElement('div', null,
-              React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8} },
-                React.createElement('span', null, actIcon(a.type)),
-                React.createElement('span', { style:{fontWeight:700,fontSize:15} }, a.type)
-              ),
-              React.createElement('div', { style:{fontSize:12,color:'var(--muted)',marginTop:3} },
-                [a.duration&&a.duration+'min', a.distance&&a.distance+'km', a.calories&&a.calories+'kcal'].filter(Boolean).join(' · ')
-              ),
-              a.notes && React.createElement('div', { style:{fontSize:12,color:'var(--muted)',marginTop:2} }, a.notes)
-            ),
-            React.createElement('div', { style:{textAlign:'right'} },
-              React.createElement('div', { style:{fontSize:11,color:'var(--muted)'} }, dayjs(a.date).format('D MMM')),
-              React.createElement('button', { onClick:()=>{ saveActivities(activities.filter(x=>x.id!==a.id)); showToast('Deleted'); }, style:{marginTop:6,fontSize:11,color:'var(--accent2)',background:'none',border:'none',cursor:'pointer'} }, 'Remove')
-            )
-          )
-        )
-      ),
-      !activities.length && React.createElement('div', { className:'empty' },
-        React.createElement('div', { className:'empty-icon' }, '🏃'),
-        React.createElement('div', { className:'empty-text' }, 'No activities yet.\nTap + Log to add a workout.')
-      )
-    ),
-
-    // Form modal
-    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
-      React.createElement('div', { className:'modal' },
-        React.createElement('div', { className:'modal-handle' }),
-        React.createElement('div', { className:'modal-title' }, 'Log Activity'),
-        React.createElement('div', { className:'tabs', style:{marginBottom:12} },
-          ACTIVITY_TYPES.map(t=>
-            React.createElement('button', { key:t, className:'tab'+(actType===t?' active':''), onClick:()=>setActType(t) },
-              actIcon(t)+' '+t
-            )
-          )
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Date'),
-          React.createElement('input', { type:'date', className:'input', value:form.date, onChange:e=>setForm({...form,date:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Duration (min)'),
-          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 45', value:form.duration, onChange:e=>setForm({...form,duration:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Calories Burned'),
-          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 350', value:form.calories, onChange:e=>setForm({...form,calories:e.target.value}) })
-        ),
-        actType==='Cycling' && React.createElement('div', null,
-          React.createElement('div', { className:'input-group' },
-            React.createElement('div', { className:'input-label' }, 'Distance (km)'),
-            React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 25', value:form.distance, onChange:e=>setForm({...form,distance:e.target.value}) })
-          ),
-          React.createElement('div', { className:'input-group' },
-            React.createElement('div', { className:'input-label' }, 'Avg Speed (km/h)'),
-            React.createElement('input', { type:'number', step:'0.1', className:'input', placeholder:'e.g. 22', value:form.speed, onChange:e=>setForm({...form,speed:e.target.value}) })
-          ),
-          React.createElement('div', { className:'input-group' },
-            React.createElement('div', { className:'input-label' }, 'Elevation Gain (m)'),
-            React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 180', value:form.elevation, onChange:e=>setForm({...form,elevation:e.target.value}) })
-          )
-        ),
-        actType==='Kettlebell' && React.createElement('div', null,
-          React.createElement('div', { className:'input-group' },
-            React.createElement('div', { className:'input-label' }, 'Kettlebell Weight (kg)'),
-            React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 16', value:form.kettlebellWeight, onChange:e=>setForm({...form,kettlebellWeight:e.target.value}) })
-          ),
-          React.createElement('div', { className:'input-group' },
-            React.createElement('div', { className:'input-label' }, 'Exercises Performed'),
-            React.createElement('input', { type:'text', className:'input', placeholder:'e.g. Swings, Cleans, Press', value:form.exercises, onChange:e=>setForm({...form,exercises:e.target.value}) })
-          )
-        ),
-        actType==='Gym' && React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Muscle Groups'),
-          React.createElement('input', { type:'text', className:'input', placeholder:'e.g. Chest, Back, Shoulders', value:form.muscleGroups, onChange:e=>setForm({...form,muscleGroups:e.target.value}) })
-        ),
-        actType==='Walking' && React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Steps'),
-          React.createElement('input', { type:'number', className:'input', placeholder:'e.g. 8500', value:form.steps, onChange:e=>setForm({...form,steps:e.target.value}) })
-        ),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Notes (optional)'),
-          React.createElement('input', { type:'text', className:'input', placeholder:'Any notes...', value:form.notes, onChange:e=>setForm({...form,notes:e.target.value}) })
-        ),
-        React.createElement('button', { className:'btn btn-primary', onClick:addActivity }, 'Save Activity'),
-        React.createElement('div', { style:{height:8} }),
-        React.createElement('button', { className:'btn btn-secondary', onClick:()=>setShowForm(false) }, 'Cancel')
-      )
-    )
-  );
+  });
 }
 
+// ── Chart.js defaults ─────────────────────────────────────────
+Chart.defaults.color = '#6b6b80';
+Chart.defaults.font.family = "-apple-system,'SF Pro Display','Helvetica Neue',sans-serif";
+Chart.defaults.font.size = 10;
+
+function makeChart(canvasId, config) {
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  charts[canvasId] = new Chart(canvas, config);
+  return charts[canvasId];
+}
+
+const chartDefaults = {
+  grid: { color: '#2a2a3a', drawBorder: false },
+  tickColor: '#6b6b80',
+};
+
+// ── Dashboard ─────────────────────────────────────────────────
+function renderDashboard() {
+  const sw = sortedWeights();
+  const lw = latestWeight();
+  const daysLeft = daysUntil(GOAL_DATE);
+  const totalLost = +(START_WEIGHT - lw).toFixed(1);
+  const remaining = +(lw - GOAL_WEIGHT).toFixed(1);
+  const pct = Math.max(0, Math.min(100, +((totalLost / (START_WEIGHT - GOAL_WEIGHT)) * 100).toFixed(1)));
+
+  document.getElementById('dash-date').textContent = fmtDate(todayStr(), 'dddd, D MMMM');
+  document.getElementById('dash-days').textContent = daysLeft;
+  document.getElementById('dash-current').textContent = lw + ' kg';
+  document.getElementById('dash-ring-pct').textContent = Math.round(pct) + '%';
+  setRingArc(document.getElementById('dash-ring-arc'), pct, CIRC_160);
+
+  const lostEl = document.getElementById('dash-lost');
+  if (totalLost > 0) { lostEl.innerHTML = '<span class="glow-num">'+totalLost+' kg</span>'; }
+  else { lostEl.textContent = '0 kg'; }
+  document.getElementById('dash-remain').textContent = remaining + ' kg';
+
+  // Weekly avg
+  let weeklyAvg = 0;
+  if (sw.length >= 2) {
+    const recent = sw.slice(-14);
+    if (recent.length >= 2) {
+      const days = dateDiffDays(recent[0].date, recent[recent.length-1].date) || 1;
+      weeklyAvg = +((recent[0].weight - recent[recent.length-1].weight) / days * 7).toFixed(2);
+    }
+  }
+  document.getElementById('dash-wavg').textContent = weeklyAvg > 0 ? weeklyAvg + ' kg' : '—';
+
+  // 7d calories
+  const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate()-7);
+  const totalCals = activities.filter(a => new Date(a.date) >= sevenAgo).reduce((s,a) => s+(a.calories||0), 0);
+  document.getElementById('dash-cals').textContent = totalCals ? totalCals.toLocaleString() : '—';
+
+  // Projection
+  const projCard = document.getElementById('dash-proj-card');
+  if (weeklyAvg > 0) {
+    projCard.classList.remove('hidden');
+    const kgPerDay = weeklyAvg / 7;
+    const projected = +(lw - kgPerDay * daysLeft).toFixed(1);
+    const msg = document.getElementById('dash-proj-msg');
+    if (projected <= GOAL_WEIGHT) {
+      msg.innerHTML = '🟢 At your current pace you are projected to reach <strong>'+projected+' kg</strong> by Jan 1, 2027. You\'re on track!';
+    } else {
+      const extra = +((projected - GOAL_WEIGHT) / (daysLeft/7)).toFixed(2);
+      msg.innerHTML = '📊 At your current pace you are projected to reach <strong>'+projected+' kg</strong>. Increase average weekly loss by <strong>'+extra+' kg/wk</strong> to reach 80 kg.';
+    }
+  } else {
+    projCard.classList.add('hidden');
+  }
+
+  // Habits
+  const todayH = habits[todayStr()] || {};
+  const allHabitIds = HABITS.flatMap(s => s.items.map(i => i.id));
+  const doneCount = allHabitIds.filter(id => todayH[id]).length;
+  const habitPct = allHabitIds.length ? Math.round(doneCount / allHabitIds.length * 100) : 0;
+  document.getElementById('dash-habit-pct').textContent = habitPct + '%';
+  document.getElementById('dash-habit-sub').textContent = doneCount + ' of ' + allHabitIds.length + ' completed';
+  document.getElementById('dash-habit-ring-pct').textContent = habitPct + '%';
+  document.getElementById('dash-habit-bar').style.width = habitPct + '%';
+  const habitArc = document.getElementById('dash-habit-arc');
+  habitArc.style.stroke = habitPct >= 80 ? '#6bffb8' : '#7c6bff';
+  setRingArc(habitArc, habitPct, CIRC_80);
+
+  // Mini chart
+  const dashChartCard = document.getElementById('dash-chart-card');
+  if (sw.length > 1) {
+    dashChartCard.classList.remove('hidden');
+    const last30 = sw.slice(-30);
+    renderWeightChart('chart-dash-weight', last30, true);
+  } else {
+    dashChartCard.classList.add('hidden');
+  }
+}
+
+// ── Weight ────────────────────────────────────────────────────
+function renderWeight() {
+  const sw = sortedWeights();
+  const latest = sw.length ? sw[sw.length-1].weight : null;
+  const lowest = sw.length ? Math.min(...sw.map(w => w.weight)) : null;
+  const avg7  = sw.length ? +(sw.slice(-7).reduce((s,w)=>s+w.weight,0)/Math.min(sw.length,7)).toFixed(2) : null;
+  const avg30 = sw.length ? +(sw.slice(-30).reduce((s,w)=>s+w.weight,0)/Math.min(sw.length,30)).toFixed(2) : null;
+
+  document.getElementById('wt-current').textContent = latest ? latest+' kg' : '—';
+  document.getElementById('wt-lowest').textContent  = lowest ? lowest+' kg' : '—';
+  document.getElementById('wt-avg7').textContent    = avg7 ? avg7+' kg' : '—';
+  document.getElementById('wt-avg30').textContent   = avg30 ? avg30+' kg' : '—';
+
+  // Trend msg
+  const trendEl = document.getElementById('wt-trend-msg');
+  if (sw.length >= 4) {
+    const last4 = sw.slice(-4);
+    const allUp = last4.every((w,i) => i===0 || w.weight > last4[i-1].weight);
+    if (allUp && lowest !== null && latest !== null) {
+      const fromLowest = +(latest - lowest).toFixed(1);
+      const trend7positive = avg7 && sw.length>=8 ? sw[sw.length-8].weight > avg7 : false;
+      trendEl.textContent = '📊 Weight is up '+fromLowest+' kg from lowest point. '+(trend7positive?'Current 7-day trend remains downward.':'Monitor trend over coming days.')+' Continue current plan.';
+      trendEl.classList.remove('hidden');
+    } else { trendEl.classList.add('hidden'); }
+  } else { trendEl.classList.add('hidden'); }
+
+  // Predicted date
+  const predCard = document.getElementById('wt-predict-card');
+  if (sw.length >= 2 && latest) {
+    const first = sw[0], last2 = sw[sw.length-1];
+    const days = Math.max(dateDiffDays(first.date, last2.date), 1);
+    const ratePerDay = (first.weight - last2.weight) / days;
+    if (ratePerDay > 0) {
+      const daysLeft = (latest - GOAL_WEIGHT) / ratePerDay;
+      const pred = new Date(); pred.setDate(pred.getDate() + Math.round(daysLeft));
+      document.getElementById('wt-predict-date').textContent = fmtDate(pred.toISOString().slice(0,10), 'D MMM YYYY');
+      predCard.classList.remove('hidden');
+    } else { predCard.classList.add('hidden'); }
+  } else { predCard.classList.add('hidden'); }
+
+  // Chart
+  const chartCard = document.getElementById('wt-chart-card');
+  if (sw.length > 1) {
+    chartCard.classList.remove('hidden');
+    renderWeightChart('chart-weight', sw, false, avg7);
+  } else { chartCard.classList.add('hidden'); }
+
+  // Entries list
+  const entriesCard = document.getElementById('wt-entries-card');
+  const emptyEl = document.getElementById('wt-empty');
+  const listEl = document.getElementById('wt-entries-list');
+  if (!sw.length) { entriesCard.classList.add('hidden'); emptyEl.classList.remove('hidden'); return; }
+  entriesCard.classList.remove('hidden'); emptyEl.classList.add('hidden');
+  const recent = [...sw].reverse().slice(0,10);
+  listEl.innerHTML = recent.map(w => `
+    <div class="habit-row">
+      <div>
+        <div class="habit-label">${w.weight} kg</div>
+        <div class="habit-time">${fmtDate(w.date,'D MMM YYYY')}${w.bodyFat?' · '+w.bodyFat+'% BF':''}${w.waist?' · '+w.waist+' cm':''}</div>
+      </div>
+      <button onclick="deleteWeight('${w.id||w.date}')" class="btn btn-danger btn-sm" style="padding:6px 10px">✕</button>
+    </div>`).join('');
+}
+
+function renderWeightChart(canvasId, data, mini, avg7) {
+  const labels = data.map(w => fmtDate(w.date, 'D/M'));
+  const vals   = data.map(w => w.weight);
+  const minV   = Math.min(...vals, GOAL_WEIGHT) - 1;
+  const maxV   = Math.max(...vals) + 1;
+
+  const goalLine = {
+    id: 'goalLine',
+    beforeDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea) return;
+      const y = scales.y.getPixelForValue(GOAL_WEIGHT);
+      ctx.save();
+      ctx.strokeStyle = '#6bffb8';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#6bffb8';
+      ctx.font = '9px -apple-system';
+      ctx.fillText('Goal', chartArea.right - 28, y - 4);
+      ctx.restore();
+    }
+  };
+
+  const datasets = [{
+    data: vals,
+    borderColor: '#7c6bff',
+    borderWidth: 2,
+    pointRadius: mini ? 0 : 3,
+    pointBackgroundColor: '#7c6bff',
+    fill: true,
+    backgroundColor: (ctx) => {
+      const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.chartArea?.bottom || 180);
+      gradient.addColorStop(0, 'rgba(124,107,255,0.3)');
+      gradient.addColorStop(1, 'rgba(124,107,255,0)');
+      return gradient;
+    },
+    tension: 0.4,
+  }];
+
+  if (!mini && avg7 && data.length) {
+    datasets.push({
+      data: new Array(data.length).fill(avg7),
+      borderColor: '#f5a623',
+      borderWidth: 1.5,
+      borderDash: [4,4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0,
+    });
+  }
+
+  makeChart(canvasId, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ctx.parsed.y.toFixed(1)+' kg' },
+        backgroundColor: '#1c1c27', borderColor: '#2a2a3a', borderWidth: 1,
+        titleColor: '#e8e8f0', bodyColor: '#e8e8f0', padding: 10, cornerRadius: 8
+      }},
+      scales: {
+        x: { grid: chartDefaults.grid, ticks: { color: '#6b6b80', maxTicksLimit: 8, font:{size:9} } },
+        y: { min: minV, max: maxV, grid: chartDefaults.grid, ticks: { color: '#6b6b80', font:{size:9} } }
+      }
+    },
+    plugins: [goalLine]
+  });
+}
+
+function saveWeight() {
+  const date   = document.getElementById('wf-date').value;
+  const weight = parseFloat(document.getElementById('wf-weight').value);
+  const bf     = parseFloat(document.getElementById('wf-bf').value) || null;
+  const waist  = parseFloat(document.getElementById('wf-waist').value) || null;
+  if (!date || isNaN(weight)) { showToast('Enter your weight'); return; }
+  weights = weights.filter(w => w.date !== date);
+  weights.push({ id: Date.now().toString(), date, weight, bodyFat: bf, waist });
+  save('weights', weights);
+  closeModal('modal-weight');
+  ['wf-weight','wf-bf','wf-waist'].forEach(id => document.getElementById(id).value = '');
+  showToast('✅ Weight logged');
+  renderPage(currentPage);
+}
+
+function deleteWeight(key) {
+  weights = weights.filter(w => (w.id||w.date) !== key);
+  save('weights', weights);
+  showToast('Deleted');
+  renderPage('weight');
+}
+
+// ── Activity ──────────────────────────────────────────────────
 function actIcon(type) {
   return {Cycling:'🚴',Kettlebell:'🏋️',Football:'⚽',Gym:'💪',Walking:'🚶'}[type]||'🏃';
 }
 
-/* ─── Nutrition Tracker ─── */
+function renderActivity() {
+  setupTabs(document.getElementById('act-tabs'), tab => {
+    currentActSubTab = tab;
+    ['act-log','act-cycling','act-stats'].forEach(id => {
+      document.getElementById(id).classList.toggle('hidden', id !== tab);
+    });
+    if (tab === 'act-stats') renderActivityStats();
+    if (tab === 'act-cycling') renderCycling();
+  });
+
+  // Recent log
+  const listEl = document.getElementById('act-log-list');
+  const emptyEl = document.getElementById('act-empty');
+  const recent = [...activities].reverse().slice(0,20);
+  if (!recent.length) { emptyEl.classList.remove('hidden'); listEl.innerHTML=''; }
+  else {
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = recent.map(a => `
+      <div class="card card-sm" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>${actIcon(a.type)}</span>
+              <span style="font-weight:700;font-size:15px">${a.type}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">
+              ${[a.duration&&a.duration+'min',a.distance&&a.distance+'km',a.calories&&a.calories+'kcal'].filter(Boolean).join(' · ')}
+            </div>
+            ${a.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${a.notes}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--muted)">${fmtDate(a.date,'D MMM')}</div>
+            <button onclick="deleteActivity(${a.id})" style="margin-top:6px;font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer">Remove</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  if (currentActSubTab === 'act-cycling') renderCycling();
+  if (currentActSubTab === 'act-stats')   renderActivityStats();
+}
+
+function renderCycling() {
+  const rides = activities.filter(a => a.type === 'Cycling');
+  const totalKm   = rides.reduce((s,a) => s+(a.distance||0), 0);
+  const totalElev = rides.reduce((s,a) => s+(+a.elevation||0), 0);
+  const totalCals = rides.reduce((s,a) => s+(a.calories||0), 0);
+  const longest   = rides.length ? Math.max(...rides.map(a => a.distance||0)) : 0;
+  const fastest   = rides.length ? Math.max(...rides.map(a => +a.speed||0)) : 0;
+
+  document.getElementById('act-cyc-stats').innerHTML = `
+    <div class="stat-tile"><div class="stat-label">Total Rides</div><div class="stat-val glow-num">${rides.length}</div></div>
+    <div class="stat-tile"><div class="stat-label">Total km</div><div class="stat-val">${totalKm.toFixed(1)}</div></div>
+    <div class="stat-tile"><div class="stat-label">Longest</div><div class="stat-val">${longest}km</div></div>
+    <div class="stat-tile"><div class="stat-label">Best Speed</div><div class="stat-val">${fastest?fastest+' km/h':'—'}</div></div>
+    <div class="stat-tile"><div class="stat-label">Elevation</div><div class="stat-val">${totalElev.toFixed(0)}m</div></div>
+    <div class="stat-tile"><div class="stat-label">Cals Burned</div><div class="stat-val">${totalCals.toLocaleString()}</div></div>`;
+
+  const badges = [
+    { km:100, icon:'🥉', name:'First 100 km', desc:'Bronze' },
+    { km:250, icon:'🥈', name:'First 250 km', desc:'Silver' },
+    { km:500, icon:'🥇', name:'First 500 km', desc:'Gold' },
+    { km:1000, icon:'🏆', name:'First 1000 km', desc:'Legend' },
+  ];
+  document.getElementById('act-cyc-badges').innerHTML = badges.map(b => `
+    <div class="cyc-badge${totalKm>=b.km?' unlocked':''}">
+      <div class="cyc-badge-icon">${totalKm>=b.km?b.icon:'🔒'}</div>
+      <div>
+        <div class="cyc-badge-name">${b.name}</div>
+        <div class="cyc-badge-sub">${totalKm>=b.km?'Unlocked!':totalKm.toFixed(1)+' / '+b.km+' km'}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderActivityStats() {
+  const now = new Date(); now.setHours(0,0,0,0);
+  const ago7  = new Date(now); ago7.setDate(now.getDate()-7);
+  const ago30 = new Date(now); ago30.setDate(now.getDate()-30);
+  const week  = activities.filter(a => new Date(a.date) >= ago7);
+  const month = activities.filter(a => new Date(a.date) >= ago30);
+  const cals7  = week.reduce((s,a)=>s+(a.calories||0),0);
+  const cals30 = month.reduce((s,a)=>s+(a.calories||0),0);
+
+  document.getElementById('act-stat-grid').innerHTML = `
+    <div class="stat-tile"><div class="stat-label">Cals (7d)</div><div class="stat-val glow-num">${cals7.toLocaleString()}</div></div>
+    <div class="stat-tile"><div class="stat-label">Cals (30d)</div><div class="stat-val">${cals30.toLocaleString()}</div></div>
+    <div class="stat-tile"><div class="stat-label">Sessions (7d)</div><div class="stat-val">${week.length}</div></div>
+    <div class="stat-tile"><div class="stat-label">Sessions (30d)</div><div class="stat-val">${month.length}</div></div>`;
+
+  // Calories bar chart
+  const calCard = document.getElementById('act-cal-card');
+  if (month.length > 0) {
+    calCard.classList.remove('hidden');
+    const map = {};
+    month.forEach(a => { map[a.date] = (map[a.date]||0) + (a.calories||0); });
+    const entries = Object.entries(map).sort((a,b)=>a[0]<b[0]?-1:1);
+    makeChart('chart-activity-cals', {
+      type: 'bar',
+      data: {
+        labels: entries.map(e => fmtDate(e[0],'D/M')),
+        datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#7c6bff', borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: {duration:400},
+        plugins: { legend:{display:false}, tooltip:{
+          callbacks:{label:ctx=>ctx.parsed.y+' kcal'},
+          backgroundColor:'#1c1c27',borderColor:'#2a2a3a',borderWidth:1,
+          titleColor:'#e8e8f0',bodyColor:'#e8e8f0',padding:10,cornerRadius:8
+        }},
+        scales: {
+          x: { grid:{color:'#2a2a3a',drawBorder:false}, ticks:{color:'#6b6b80',font:{size:9},maxTicksLimit:8} },
+          y: { grid:{color:'#2a2a3a',drawBorder:false}, ticks:{color:'#6b6b80',font:{size:9}} }
+        }
+      }
+    });
+  } else { calCard.classList.add('hidden'); }
+}
+
+function setActType(type) {
+  currentActType = type;
+  document.querySelectorAll('#act-type-tabs .tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.acttype === type);
+  });
+  ['af-cycling-fields','af-kb-fields','af-gym-fields','af-walk-fields'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  if (type==='Cycling')   document.getElementById('af-cycling-fields').classList.remove('hidden');
+  if (type==='Kettlebell') document.getElementById('af-kb-fields').classList.remove('hidden');
+  if (type==='Gym')        document.getElementById('af-gym-fields').classList.remove('hidden');
+  if (type==='Walking')    document.getElementById('af-walk-fields').classList.remove('hidden');
+}
+
+function saveActivity() {
+  const dur = parseFloat(document.getElementById('af-duration').value);
+  if (isNaN(dur)) { showToast('Enter duration'); return; }
+  const entry = {
+    id: Date.now(),
+    type: currentActType,
+    date: document.getElementById('af-date').value || todayStr(),
+    duration: dur,
+    calories: parseFloat(document.getElementById('af-calories').value)||0,
+    distance: parseFloat(document.getElementById('af-distance').value)||0,
+    speed: document.getElementById('af-speed').value,
+    elevation: document.getElementById('af-elevation').value,
+    kbweight: document.getElementById('af-kbweight').value,
+    exercises: document.getElementById('af-exercises').value,
+    muscles: document.getElementById('af-muscles').value,
+    steps: document.getElementById('af-steps').value,
+    notes: document.getElementById('af-notes').value,
+  };
+  activities.push(entry);
+  save('activities', activities);
+  closeModal('modal-activity');
+  ['af-duration','af-calories','af-distance','af-speed','af-elevation',
+   'af-kbweight','af-exercises','af-muscles','af-steps','af-notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  showToast('✅ Activity logged');
+  renderPage(currentPage);
+}
+
+function deleteActivity(id) {
+  activities = activities.filter(a => a.id !== id);
+  save('activities', activities);
+  showToast('Deleted');
+  renderPage('activity');
+}
+
+// ── Nutrition ─────────────────────────────────────────────────
 const MEAL_STRUCTURE = {
-  Breakfast: [
+  '🌅 Breakfast': [
     {id:'jeera', name:'Jeera Water', icon:'💧'},
     {id:'almonds', name:'Almonds', icon:'🌰'},
     {id:'flax', name:'Flax Seeds', icon:'🌾'},
   ],
-  Lunch: [
+  '☀️ Lunch': [
     {id:'eggs', name:'Eggs', icon:'🥚'},
     {id:'chicken_l', name:'Chicken', icon:'🍗'},
-    {id:'other_l', name:'Other', icon:'🍱', custom:true},
+    {id:'other_l', name:'Other', icon:'🍱'},
   ],
-  Snack: [
+  '🍎 Snack': [
     {id:'fruit', name:'Fruit', icon:'🍎'},
     {id:'whey', name:'Whey Protein', icon:'💪'},
   ],
-  Dinner: [
+  '🌙 Dinner': [
     {id:'chicken_d', name:'Chicken', icon:'🍗'},
-    {id:'other_d', name:'Other', icon:'🍱', custom:true},
+    {id:'other_d', name:'Other', icon:'🍱'},
   ],
-  Night: [
+  '🫖 Night': [
     {id:'cinnamon', name:'Cinnamon Water', icon:'🫖'},
-    {id:'date', name:'Date', icon:'🌴'},
+    {id:'date_fruit', name:'Date', icon:'🌴'},
   ],
 };
+const ALL_NUT_IDS = Object.values(MEAL_STRUCTURE).flat().map(i=>i.id);
 
-function NutritionTracker({ nutrition, saveNutrition, showToast }) {
-  const todayEntry = nutrition.find(n=>n.date===today()) || { date:today(), meals:{}, water:0, protein:0, cheat:false, alcohol:false, notes:'' };
-  const [entry, setEntry] = useState(todayEntry);
-  const [showForm, setShowForm] = useState(false);
-  const [tab2, setTab2] = useState('today');
-
-  const updateEntry = (updated) => {
-    setEntry(updated);
-    const others = nutrition.filter(n=>n.date!==today());
-    saveNutrition([...others, updated]);
-  };
-
-  const toggleMeal = (meal, id) => {
-    const meals = { ...entry.meals, [meal]: { ...(entry.meals[meal]||{}), [id]: !(entry.meals[meal]||{})[id] } };
-    updateEntry({ ...entry, meals });
-  };
-
-  const allItems = Object.values(MEAL_STRUCTURE).flat();
-  const checkedItems = Object.values(entry.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
-  const totalItems = allItems.length;
-  const compliance = Math.round(checkedItems/totalItems*100);
-
-  const last30 = nutrition.filter(n=>dayjs(n.date).isAfter(dayjs().subtract(30,'day')));
-  const avgCompliance = last30.length ? Math.round(last30.reduce((s,n)=>{
-    const c = Object.values(n.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
-    return s + c/totalItems*100;
-  },0)/last30.length) : 0;
-
-  return React.createElement('div', null,
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', { className:'page-title' }, '🥗 Nutrition'),
-      React.createElement('div', { style:{display:'flex',gap:8} },
-        React.createElement('button', { className:'btn btn-secondary btn-sm', onClick:()=>setShowForm(true) }, 'Details')
-      )
-    ),
-
-    React.createElement('div', { className:'tabs' },
-      ['today','history'].map(t=>
-        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
-          t==='today'?'Today':'History'
-        )
-      )
-    ),
-
-    tab2==='today' && React.createElement('div', null,
-      // Compliance ring + water
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12} },
-          React.createElement('div', null,
-            React.createElement('div', { className:'card-title' }, "Today's Compliance"),
-            React.createElement('div', { style:{fontSize:32,fontWeight:800,letterSpacing:'-0.04em',color:'var(--accent)'} }, compliance+'%'),
-            React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, checkedItems+' / '+totalItems+' items')
-          ),
-          React.createElement(Ring, { pct:compliance, label:'Today', size:80, color: compliance>=80?'#6bffb8':'#7c6bff' })
-        ),
-        // Water + protein
-        React.createElement('div', { className:'grid-2', style:{marginBottom:0} },
-          React.createElement('div', { style:{background:'var(--surface2)',borderRadius:10,padding:'10px 12px'} },
-            React.createElement('div', { className:'stat-label' }, '💧 Water (L)'),
-            React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginTop:4} },
-              React.createElement('button', { onClick:()=>updateEntry({...entry,water:Math.max(0,+(entry.water-0.25).toFixed(2))}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '−'),
-              React.createElement('span', { style:{fontSize:18,fontWeight:700,minWidth:36,textAlign:'center'} }, entry.water||0),
-              React.createElement('button', { onClick:()=>updateEntry({...entry,water:+(entry.water+0.25).toFixed(2)}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '+')
-            )
-          ),
-          React.createElement('div', { style:{background:'var(--surface2)',borderRadius:10,padding:'10px 12px'} },
-            React.createElement('div', { className:'stat-label' }, '🥩 Protein (g)'),
-            React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginTop:4} },
-              React.createElement('button', { onClick:()=>updateEntry({...entry,protein:Math.max(0,(entry.protein||0)-10)}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '−'),
-              React.createElement('span', { style:{fontSize:18,fontWeight:700,minWidth:36,textAlign:'center'} }, entry.protein||0),
-              React.createElement('button', { onClick:()=>updateEntry({...entry,protein:(entry.protein||0)+10}), style:{background:'var(--border)',border:'none',borderRadius:6,color:'var(--text)',padding:'4px 10px',cursor:'pointer',fontSize:16} }, '+')
-            )
-          )
-        )
-      ),
-
-      // Cheat / alcohol
-      React.createElement('div', { className:'grid-2' },
-        React.createElement('button', { className:'btn '+(entry.cheat?'btn-danger':'btn-secondary'), style:{border: entry.cheat?'2px solid var(--accent2)':'1px solid var(--border)'}, onClick:()=>updateEntry({...entry,cheat:!entry.cheat}) },
-          '🍕 Cheat '+(entry.cheat?'ON':'OFF')
-        ),
-        React.createElement('button', { className:'btn '+(entry.alcohol?'btn-danger':'btn-secondary'), style:{border: entry.alcohol?'2px solid var(--accent2)':'1px solid var(--border)'}, onClick:()=>updateEntry({...entry,alcohol:!entry.alcohol}) },
-          '🍺 Alcohol '+(entry.alcohol?'ON':'OFF')
-        )
-      ),
-
-      // Meal checklist
-      Object.entries(MEAL_STRUCTURE).map(([meal, items]) =>
-        React.createElement('div', { key:meal, className:'card' },
-          React.createElement('div', { className:'card-title' }, meal),
-          items.map(item =>
-            React.createElement('div', { key:item.id, className:'habit-row' },
-              React.createElement('div', null,
-                React.createElement('div', { className:'habit-label' }, item.icon+' '+item.name)
-              ),
-              React.createElement('button', {
-                className:'check-btn'+((entry.meals[meal]||{})[item.id]?' checked':''),
-                onClick:()=>toggleMeal(meal, item.id)
-              }, (entry.meals[meal]||{})[item.id] ? '✓' : '')
-            )
-          )
-        )
-      )
-    ),
-
-    tab2==='history' && React.createElement('div', null,
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, '30-Day Avg Compliance'),
-        React.createElement('div', { style:{fontSize:32,fontWeight:800,color:'var(--accent)',letterSpacing:'-0.04em'} }, avgCompliance+'%'),
-        React.createElement('div', { className:'progress-wrap', style:{marginTop:8} },
-          React.createElement('div', { className:'progress-bar', style:{width:avgCompliance+'%'} })
-        )
-      ),
-      [...nutrition].reverse().slice(0,14).map(n => {
-        const c = Object.values(n.meals||{}).flatMap(m=>Object.values(m)).filter(Boolean).length;
-        const pct = Math.round(c/totalItems*100);
-        return React.createElement('div', { key:n.date, className:'card card-sm', style:{marginBottom:8} },
-          React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'center'} },
-            React.createElement('div', null,
-              React.createElement('div', { style:{fontSize:13,fontWeight:600} }, dayjs(n.date).format('D MMM YYYY')),
-              React.createElement('div', { style:{fontSize:11,color:'var(--muted)',marginTop:2} },
-                [n.water&&`💧 ${n.water}L`, n.protein&&`🥩 ${n.protein}g`, n.cheat&&'🍕 Cheat', n.alcohol&&'🍺 Alcohol'].filter(Boolean).join(' · ')
-              )
-            ),
-            React.createElement('div', { style:{fontSize:16,fontWeight:700,color:pct>=80?'var(--accent3)':'var(--accent)'} }, pct+'%')
-          )
-        );
-      })
-    ),
-
-    showForm && React.createElement('div', { className:'modal-backdrop', onClick:e=>e.target===e.currentTarget&&setShowForm(false) },
-      React.createElement('div', { className:'modal' },
-        React.createElement('div', { className:'modal-handle' }),
-        React.createElement('div', { className:'modal-title' }, 'Nutrition Details'),
-        React.createElement('div', { className:'input-group' },
-          React.createElement('div', { className:'input-label' }, 'Notes'),
-          React.createElement('input', { type:'text', className:'input', placeholder:'Any notes...', value:entry.notes||'', onChange:e=>updateEntry({...entry,notes:e.target.value}) })
-        ),
-        React.createElement('button', { className:'btn btn-primary', onClick:()=>setShowForm(false) }, 'Done')
-      )
-    )
-  );
+function getTodayNut() {
+  return nutrition.find(n => n.date === todayStr()) || { date:todayStr(), meals:{}, water:0, protein:0, cheat:false, alcohol:false, notes:'' };
+}
+function saveTodayNut(entry) {
+  nutrition = nutrition.filter(n => n.date !== todayStr());
+  nutrition.push(entry);
+  save('nutrition', nutrition);
 }
 
-/* ─── Habit Tracker ─── */
+function renderNutrition() {
+  setupTabs(document.getElementById('nut-tabs'), tab => {
+    currentNutSubTab = tab;
+    document.getElementById('nut-today').classList.toggle('hidden', tab !== 'nut-today');
+    document.getElementById('nut-history').classList.toggle('hidden', tab !== 'nut-history');
+    if (tab === 'nut-history') renderNutHistory();
+  });
+  renderNutToday();
+}
+
+function renderNutToday() {
+  const entry = getTodayNut();
+  const checked = ALL_NUT_IDS.filter(id => {
+    return Object.values(entry.meals||{}).some(m => m[id]);
+  }).length;
+  const total = ALL_NUT_IDS.length;
+  const pct = Math.round(checked / total * 100);
+
+  document.getElementById('nut-compliance-val').textContent = pct + '%';
+  document.getElementById('nut-compliance-sub').textContent = checked + ' / ' + total + ' items';
+  document.getElementById('nut-ring-pct').textContent = pct + '%';
+  const arc = document.getElementById('nut-ring-arc');
+  arc.style.stroke = pct >= 80 ? '#6bffb8' : '#7c6bff';
+  setRingArc(arc, pct, CIRC_80);
+
+  document.getElementById('nut-water-val').textContent = entry.water || 0;
+  document.getElementById('nut-protein-val').textContent = entry.protein || 0;
+
+  // Cheat / alcohol buttons
+  const cheatBtn = document.getElementById('nut-cheat-btn');
+  const alcBtn   = document.getElementById('nut-alcohol-btn');
+  if (entry.cheat) {
+    cheatBtn.textContent = '🍕 Cheat ON';
+    cheatBtn.style.background = 'rgba(255,107,107,.15)';
+    cheatBtn.style.color = 'var(--accent2)';
+    cheatBtn.style.border = '1px solid rgba(255,107,107,.3)';
+  } else {
+    cheatBtn.textContent = '🍕 Cheat OFF';
+    cheatBtn.style.background = 'var(--surface2)';
+    cheatBtn.style.color = 'var(--text)';
+    cheatBtn.style.border = '1px solid var(--border)';
+  }
+  if (entry.alcohol) {
+    alcBtn.textContent = '🍺 Alcohol ON';
+    alcBtn.style.background = 'rgba(255,107,107,.15)';
+    alcBtn.style.color = 'var(--accent2)';
+    alcBtn.style.border = '1px solid rgba(255,107,107,.3)';
+  } else {
+    alcBtn.textContent = '🍺 Alcohol OFF';
+    alcBtn.style.background = 'var(--surface2)';
+    alcBtn.style.color = 'var(--text)';
+    alcBtn.style.border = '1px solid var(--border)';
+  }
+
+  // Meal checklist
+  const listEl = document.getElementById('nut-meal-checklist');
+  listEl.innerHTML = Object.entries(MEAL_STRUCTURE).map(([meal, items]) => `
+    <div class="card">
+      <div class="card-title">${meal}</div>
+      ${items.map(item => {
+        const isChecked = (entry.meals[meal]||{})[item.id];
+        return `<div class="habit-row">
+          <div>
+            <div class="habit-label">${item.icon} ${item.name}</div>
+          </div>
+          <button class="check-btn${isChecked?' checked':''}" onclick="toggleMeal('${meal}','${item.id}')">${isChecked?'✓':''}</button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+
+function renderNutHistory() {
+  const last30 = nutrition.filter(n => {
+    const d = new Date(n.date); const ago = new Date(); ago.setDate(ago.getDate()-30);
+    return d >= ago;
+  });
+  const avg = last30.length ? Math.round(last30.reduce((s,n) => {
+    const c = ALL_NUT_IDS.filter(id => Object.values(n.meals||{}).some(m=>m[id])).length;
+    return s + c/ALL_NUT_IDS.length*100;
+  },0) / last30.length) : 0;
+
+  document.getElementById('nut-hist-avg').textContent = avg + '%';
+  document.getElementById('nut-hist-bar').style.width = avg + '%';
+
+  const sorted = [...nutrition].reverse().slice(0,14);
+  document.getElementById('nut-hist-list').innerHTML = sorted.map(n => {
+    const c = ALL_NUT_IDS.filter(id => Object.values(n.meals||{}).some(m=>m[id])).length;
+    const p = Math.round(c/ALL_NUT_IDS.length*100);
+    const extras = [n.water&&'💧'+n.water+'L', n.protein&&'🥩'+n.protein+'g', n.cheat&&'🍕 Cheat', n.alcohol&&'🍺 Alcohol'].filter(Boolean).join(' · ');
+    return `<div class="card card-sm" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:600">${fmtDate(n.date,'D MMM YYYY')}</div>
+          ${extras?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${extras}</div>`:''}
+        </div>
+        <div style="font-size:16px;font-weight:700;color:${p>=80?'var(--accent3)':'var(--accent)'}">${p}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleMeal(meal, id) {
+  const entry = getTodayNut();
+  if (!entry.meals[meal]) entry.meals[meal] = {};
+  entry.meals[meal][id] = !entry.meals[meal][id];
+  saveTodayNut(entry);
+  renderNutToday();
+}
+
+function adjustWater(delta) {
+  const entry = getTodayNut();
+  entry.water = Math.max(0, +((entry.water||0)+delta).toFixed(2));
+  saveTodayNut(entry);
+  document.getElementById('nut-water-val').textContent = entry.water;
+}
+function adjustProtein(delta) {
+  const entry = getTodayNut();
+  entry.protein = Math.max(0, (entry.protein||0)+delta);
+  saveTodayNut(entry);
+  document.getElementById('nut-protein-val').textContent = entry.protein;
+}
+function toggleNutFlag(flag) {
+  const entry = getTodayNut();
+  entry[flag] = !entry[flag];
+  saveTodayNut(entry);
+  renderNutToday();
+}
+function saveNutNotes() {
+  const entry = getTodayNut();
+  entry.notes = document.getElementById('nf-notes').value;
+  saveTodayNut(entry);
+  closeModal('modal-nutrition-detail');
+  showToast('✅ Saved');
+}
+
+// ── Habits ────────────────────────────────────────────────────
 const HABITS = [
   { section:'🌅 Morning', items:[
-    { id:'weighed', label:'Weighed myself', time:'7:00 AM' },
-    { id:'jeera', label:'Jeera water', time:'7:05 AM' },
-    { id:'almonds2', label:'Almonds & flax seeds', time:'7:10 AM' },
+    {id:'weighed', label:'Weighed myself', time:'7:00 AM'},
+    {id:'jeera_h', label:'Jeera water', time:'7:05 AM'},
+    {id:'almonds_h', label:'Almonds & flax seeds', time:'7:10 AM'},
   ]},
   { section:'☀️ Day', items:[
-    { id:'lunch', label:'Lunch completed', time:'1:00 PM' },
-    { id:'water', label:'Water target (3L)', time:'All day' },
+    {id:'lunch_h', label:'Lunch completed', time:'1:00 PM'},
+    {id:'water_h', label:'Water target (3L)', time:'All day'},
   ]},
   { section:'🏃 Workout', items:[
-    { id:'h_cycling', label:'Cycling', time:'6:00 PM' },
-    { id:'h_kettlebell', label:'Kettlebell', time:'6:00 PM' },
-    { id:'h_football', label:'Football', time:'6:00 PM' },
-    { id:'h_walk', label:'Walk', time:'Any time' },
+    {id:'h_cycling', label:'Cycling', time:'6:00 PM'},
+    {id:'h_kettlebell', label:'Kettlebell', time:'6:00 PM'},
+    {id:'h_football', label:'Football', time:'6:00 PM'},
+    {id:'h_walk', label:'Walk', time:'Any time'},
   ]},
   { section:'🌙 Evening', items:[
-    { id:'whey2', label:'Whey protein', time:'7:30 PM' },
-    { id:'dinner2', label:'Dinner completed', time:'9:00 PM' },
-    { id:'clothes', label:'Prepared clothes for tomorrow', time:'10:30 PM' },
-    { id:'cinnamon2', label:'Cinnamon water', time:'11:00 PM' },
+    {id:'whey_h', label:'Whey protein', time:'7:30 PM'},
+    {id:'dinner_h', label:'Dinner completed', time:'9:00 PM'},
+    {id:'clothes_h', label:'Prepared clothes for tomorrow', time:'10:30 PM'},
+    {id:'cinnamon_h', label:'Cinnamon water', time:'11:00 PM'},
   ]},
 ];
+const ALL_HABIT_IDS = HABITS.flatMap(s => s.items.map(i => i.id));
 
-function HabitTracker({ habits, saveHabits }) {
-  const [viewDate, setViewDate] = useState(today());
-
-  const dayHabits = habits[viewDate] || {};
-
-  const toggle = (id) => {
-    const updated = { ...habits, [viewDate]: { ...dayHabits, [id]: !dayHabits[id] } };
-    saveHabits(updated);
-  };
-
-  const allIds = HABITS.flatMap(s=>s.items.map(i=>i.id));
-  const completed = allIds.filter(id=>dayHabits[id]).length;
-  const pct = Math.round(completed/allIds.length*100);
+function renderHabits() {
+  // Date nav
+  document.getElementById('habit-nav-date').textContent = fmtDate(habitViewDate, 'dddd, D MMMM')
+    .replace('dddd', '') || habitViewDate;
+  // Friendly date display
+  const [y,m,d] = habitViewDate.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('habit-nav-date').textContent = dayNames[dt.getDay()]+', '+d+' '+monthNames[m-1];
+  document.getElementById('habit-nav-fwd').disabled = habitViewDate >= todayStr();
 
   // Streak
-  const streak = useMemo(() => {
-    let s = 0;
-    let d = dayjs().subtract(1,'day');
-    while (true) {
-      const dk = d.format('YYYY-MM-DD');
-      const dh = habits[dk]||{};
-      const c = allIds.filter(id=>dh[id]).length;
-      if (c/allIds.length < 0.8) break;
-      s++; d = d.subtract(1,'day');
-    }
-    return s;
-  }, [habits]);
+  let streak = 0;
+  let d2 = new Date(); d2.setDate(d2.getDate()-1);
+  while (true) {
+    const dk = d2.toISOString().slice(0,10);
+    const dh = habits[dk]||{};
+    const done = ALL_HABIT_IDS.filter(id=>dh[id]).length;
+    if (done/ALL_HABIT_IDS.length < 0.8) break;
+    streak++; d2.setDate(d2.getDate()-1);
+  }
+  const streakBadge = document.getElementById('habit-streak-badge');
+  if (streak > 0) { streakBadge.textContent = '🔥 '+streak+' day streak'; streakBadge.classList.remove('hidden'); }
+  else { streakBadge.classList.add('hidden'); }
 
-  return React.createElement('div', null,
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', { className:'page-title' }, '✅ Habits'),
-      streak > 0 && React.createElement('div', { className:'streak-badge' }, '🔥 '+streak+' day streak')
-    ),
+  // Progress
+  const dayH = habits[habitViewDate]||{};
+  const done = ALL_HABIT_IDS.filter(id=>dayH[id]).length;
+  const pct  = Math.round(done/ALL_HABIT_IDS.length*100);
+  document.getElementById('habit-pct').textContent = pct+'%';
+  document.getElementById('habit-sub').textContent = done+' of '+ALL_HABIT_IDS.length+' done';
+  document.getElementById('habit-ring-pct').textContent = pct+'%';
+  document.getElementById('habit-prog-bar').style.width = pct+'%';
+  const arc = document.getElementById('habit-ring-arc');
+  arc.style.stroke = pct>=80?'#6bffb8':'#7c6bff';
+  setRingArc(arc, pct, CIRC_80);
 
-    // Date nav
-    React.createElement('div', { style:{display:'flex',alignItems:'center',gap:8,marginBottom:12} },
-      React.createElement('button', { className:'btn btn-secondary btn-sm btn-icon', onClick:()=>setViewDate(dayjs(viewDate).subtract(1,'day').format('YYYY-MM-DD')) }, '‹'),
-      React.createElement('div', { style:{flex:1,textAlign:'center',fontWeight:600,fontSize:14} }, dayjs(viewDate).format('dddd, D MMM')),
-      React.createElement('button', { className:'btn btn-secondary btn-sm btn-icon', onClick:()=>setViewDate(dayjs(viewDate).add(1,'day').format('YYYY-MM-DD')), disabled:viewDate>=today() }, '›')
-    ),
-
-    // Progress
-    React.createElement('div', { className:'card' },
-      React.createElement('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10} },
-        React.createElement('div', null,
-          React.createElement('div', { style:{fontSize:28,fontWeight:800,letterSpacing:'-0.04em'} }, pct+'%'),
-          React.createElement('div', { style:{fontSize:12,color:'var(--muted)'} }, completed+' of '+allIds.length+' done')
-        ),
-        React.createElement(Ring, { pct, label:'Today', size:80, color: pct>=80?'#6bffb8':'#7c6bff' })
-      ),
-      React.createElement('div', { className:'progress-wrap' },
-        React.createElement('div', { className:'progress-bar', style:{width:pct+'%'} })
-      )
-    ),
-
-    HABITS.map(section =>
-      React.createElement('div', { key:section.section, className:'card' },
-        React.createElement('div', { className:'card-title' }, section.section),
-        section.items.map(item =>
-          React.createElement('div', { key:item.id, className:'habit-row' },
-            React.createElement('div', null,
-              React.createElement('div', { className:'habit-label' }, item.label),
-              React.createElement('div', { className:'habit-time' }, item.time)
-            ),
-            React.createElement('button', { className:'check-btn'+(dayHabits[item.id]?' checked':''), onClick:()=>toggle(item.id) },
-              dayHabits[item.id]?'✓':''
-            )
-          )
-        )
-      )
-    )
-  );
+  // Sections
+  document.getElementById('habit-sections').innerHTML = HABITS.map(section => `
+    <div class="card">
+      <div class="card-title">${section.section}</div>
+      ${section.items.map(item => {
+        const isChecked = !!(habits[habitViewDate]||{})[item.id];
+        return `<div class="habit-row">
+          <div>
+            <div class="habit-label">${item.label}</div>
+            <div class="habit-time">${item.time}</div>
+          </div>
+          <button class="check-btn${isChecked?' checked':''}" onclick="toggleHabit('${item.id}')">${isChecked?'✓':''}</button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 }
 
-/* ─── Reminders ─── */
-function defaultReminders() {
-  return [
-    { id:1, time:'07:00', label:'Weigh yourself', on:true },
-    { id:2, time:'07:05', label:'Jeera water', on:true },
-    { id:3, time:'07:10', label:'Almonds and flax seeds', on:true },
-    { id:4, time:'13:00', label:'Lunch time', on:true },
-    { id:5, time:'17:00', label:'Workout preparation', on:true },
-    { id:6, time:'18:00', label:'Workout', on:true },
-    { id:7, time:'19:30', label:'Whey protein', on:true },
-    { id:8, time:'21:00', label:'Dinner', on:true },
-    { id:9, time:'22:30', label:'Prepare clothes and gear for tomorrow', on:true },
-    { id:10, time:'23:00', label:'Cinnamon water', on:true },
-  ];
+function toggleHabit(id) {
+  if (!habits[habitViewDate]) habits[habitViewDate] = {};
+  habits[habitViewDate][id] = !habits[habitViewDate][id];
+  save('habits', habits);
+  renderHabits();
 }
 
-/* ─── More Page ─── */
-function MorePage({ weights, activities, nutrition, habits, reminders, saveReminders, showToast }) {
-  const [tab2, setTab2] = useState('milestones');
-  const [notifGranted, setNotifGranted] = useState(typeof Notification !== 'undefined' && Notification.permission === 'granted');
+function habitNav(dir) {
+  const d = new Date(habitViewDate);
+  d.setDate(d.getDate()+dir);
+  const nk = d.toISOString().slice(0,10);
+  if (dir > 0 && nk > todayStr()) return;
+  habitViewDate = nk;
+  renderHabits();
+}
 
-  const sorted = [...weights].sort((a,b)=>a.date.localeCompare(b.date));
-  const latestW = sorted.length ? sorted[sorted.length-1].weight : START_WEIGHT;
-  const totalLost = +(START_WEIGHT - latestW).toFixed(1);
-  const rides = activities.filter(a=>a.type==='Cycling');
+// ── More ──────────────────────────────────────────────────────
+function renderMore() {
+  setupTabs(document.getElementById('more-tabs'), tab => {
+    currentMoreSubTab = tab;
+    ['more-milestones','more-reminders','more-data'].forEach(id => {
+      document.getElementById(id).classList.toggle('hidden', id !== tab);
+    });
+    if (tab === 'more-reminders') renderReminders();
+    if (tab === 'more-data')      renderDataSummary();
+  });
+  renderMilestones();
+  renderReminders();
+  renderDataSummary();
+}
+
+function renderMilestones() {
+  const sw = sortedWeights();
+  const lw = latestWeight();
+  const totalLost = +(START_WEIGHT - lw).toFixed(1);
+  const rides = activities.filter(a => a.type==='Cycling');
   const totalKm = rides.reduce((s,a)=>s+(a.distance||0),0);
 
   const milestones = [
-    { icon:'🚴', name:'First ride completed', achieved: rides.length > 0, date: rides[0]?.date },
-    { icon:'🛣️', name:'First 25 km ride', achieved: rides.some(r=>(r.distance||0)>=25) },
-    { icon:'📅', name:'First week completed', achieved: sorted.length >= 7 },
-    { icon:'💪', name:'First 5 kg lost', achieved: totalLost >= 5 },
-    { icon:'🔥', name:'First 10 kg lost', achieved: totalLost >= 10 },
-    { icon:'⚡', name:'Reached 90 kg', achieved: latestW <= 90 },
-    { icon:'🌟', name:'Reached 85 kg', achieved: latestW <= 85 },
-    { icon:'🏆', name:'Reached 80 kg!', achieved: latestW <= 80 },
+    {icon:'🚴', name:'First ride completed',   achieved: rides.length>0,      date: rides[0]?.date},
+    {icon:'🛣️', name:'First 25 km ride',        achieved: rides.some(r=>(r.distance||0)>=25)},
+    {icon:'📅', name:'First week of logging',   achieved: sw.length>=7},
+    {icon:'💪', name:'First 5 kg lost',          achieved: totalLost>=5},
+    {icon:'🔥', name:'First 10 kg lost',         achieved: totalLost>=10},
+    {icon:'⚡', name:'Reached 90 kg',            achieved: lw<=90},
+    {icon:'🌟', name:'Reached 85 kg',            achieved: lw<=85},
+    {icon:'🏆', name:'Reached 80 kg!',           achieved: lw<=80},
   ];
 
-  const requestNotif = async () => {
-    if (typeof Notification === 'undefined') { showToast('Notifications not supported'); return; }
-    const perm = await Notification.requestPermission();
-    setNotifGranted(perm === 'granted');
-    showToast(perm === 'granted' ? '✅ Notifications enabled!' : '❌ Notifications denied');
-  };
-
-  const exportJSON = () => {
-    const data = { weights, activities, nutrition, habits };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project80_backup.json'; a.click();
-    showToast('📦 JSON exported');
-  };
-
-  const exportCSV = () => {
-    const rows = [['Date','Weight','Body Fat','Waist'], ...weights.map(w=>[w.date,w.weight,w.bodyFat||'',w.waist||''])];
-    const csv = rows.map(r=>r.join(',')).join('\n');
-    const blob = new Blob([csv], {type:'text/csv'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project80_weight.csv'; a.click();
-    showToast('📊 CSV exported');
-  };
-
-  const importData = () => {
-    const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
-    inp.onchange = e => {
-      const file = e.target.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        try {
-          const data = JSON.parse(ev.target.result);
-          if (data.weights) save('weights', data.weights);
-          if (data.activities) save('activities', data.activities);
-          if (data.nutrition) save('nutrition', data.nutrition);
-          if (data.habits) save('habits', data.habits);
-          showToast('✅ Data imported! Refresh app.');
-        } catch { showToast('❌ Invalid file'); }
-      };
-      reader.readAsText(file);
-    };
-    inp.click();
-  };
-
-  return React.createElement('div', null,
-    React.createElement('div', { className:'page-header' },
-      React.createElement('div', { className:'page-title' }, '⋯ More')
-    ),
-
-    React.createElement('div', { className:'tabs' },
-      ['milestones','reminders','data'].map(t=>
-        React.createElement('button', { key:t, className:'tab'+(tab2===t?' active':''), onClick:()=>setTab2(t) },
-          t==='milestones'?'🏆 Goals':t==='reminders'?'🔔 Alerts':'💾 Data'
-        )
-      )
-    ),
-
-    tab2 === 'milestones' && React.createElement('div', null,
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'Milestones'),
-        milestones.map((m,i) =>
-          React.createElement('div', { key:i, className:'milestone'+(m.achieved?' achieved':' pending') },
-            React.createElement('div', { className:'milestone-icon' }, m.icon),
-            React.createElement('div', { className:'milestone-info' },
-              React.createElement('div', { className:'milestone-name', style:{color: m.achieved?'var(--text)':'var(--muted)'} }, m.name),
-              React.createElement('div', { className:'milestone-date' }, m.achieved ? '✅ Achieved'+(m.date?' · '+dayjs(m.date).format('D MMM YYYY'):'') : 'Pending')
-            )
-          )
-        )
-      )
-    ),
-
-    tab2 === 'reminders' && React.createElement('div', null,
-      !notifGranted && React.createElement('div', { className:'trend-msg', style:{marginBottom:12} },
-        '🔔 Enable notifications to receive reminders on your iPhone.',
-        React.createElement('div', { style:{marginTop:8} },
-          React.createElement('button', { className:'btn btn-primary btn-sm', onClick:requestNotif }, 'Enable Notifications')
-        )
-      ),
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'Daily Reminders'),
-        reminders.map(r =>
-          React.createElement('div', { key:r.id, className:'reminder-row' },
-            React.createElement('div', { className:'reminder-time' }, r.time),
-            React.createElement('div', { className:'reminder-label' }, r.label),
-            React.createElement('button', { className:'toggle'+(r.on?' on':' off'), onClick:()=>{ saveReminders(reminders.map(x=>x.id===r.id?{...x,on:!x.on}:x)); } })
-          )
-        )
-      )
-    ),
-
-    tab2 === 'data' && React.createElement('div', null,
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'Export Data'),
-        React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:10} },
-          React.createElement('button', { className:'btn btn-secondary', onClick:exportJSON }, '📦 Export All Data (JSON)'),
-          React.createElement('button', { className:'btn btn-secondary', onClick:exportCSV }, '📊 Export Weight Log (CSV)'),
-          React.createElement('button', { className:'btn btn-secondary', onClick:importData }, '📥 Import from JSON Backup')
-        )
-      ),
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'Data Summary'),
-        React.createElement('div', { className:'grid-3' },
-          React.createElement('div', { className:'stat-tile' },
-            React.createElement('div', { className:'stat-label' }, 'Weight'),
-            React.createElement('div', { className:'stat-val' }, weights.length)
-          ),
-          React.createElement('div', { className:'stat-tile' },
-            React.createElement('div', { className:'stat-label' }, 'Activity'),
-            React.createElement('div', { className:'stat-val' }, activities.length)
-          ),
-          React.createElement('div', { className:'stat-tile' },
-            React.createElement('div', { className:'stat-label' }, 'Nutrition'),
-            React.createElement('div', { className:'stat-val' }, nutrition.length)
-          )
-        )
-      ),
-      React.createElement('div', { className:'card' },
-        React.createElement('div', { className:'card-title' }, 'About'),
-        React.createElement('div', { style:{fontSize:14,color:'var(--muted)',lineHeight:1.6} },
-          React.createElement('div', null, 'Project 80'),
-          React.createElement('div', null, 'Goal: 99.9 kg → 80 kg by Jan 1, 2027'),
-          React.createElement('div', null, 'All data stored locally on this device.'),
-          React.createElement('div', { style:{marginTop:8,fontSize:12} }, 'Install as PWA: tap Share → Add to Home Screen')
-        )
-      )
-    )
-  );
+  document.getElementById('milestone-list').innerHTML = milestones.map(m => `
+    <div class="milestone${m.achieved?' achieved':' pending'}">
+      <div class="milestone-icon">${m.icon}</div>
+      <div>
+        <div class="milestone-name" style="color:${m.achieved?'var(--text)':'var(--muted)'}">${m.name}</div>
+        <div class="milestone-date">${m.achieved?'✅ Achieved'+(m.date?' · '+fmtDate(m.date,'D MMM YYYY'):''):'Pending'}</div>
+      </div>
+    </div>`).join('');
 }
 
-/* ─── Reminder Notifications ─── */
-function scheduleReminders(reminders) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  reminders.filter(r=>r.on).forEach(r => {
-    const [h,m] = r.time.split(':').map(Number);
-    const now = new Date();
-    const trigger = new Date(now);
-    trigger.setHours(h,m,0,0);
-    if (trigger <= now) trigger.setDate(trigger.getDate()+1);
-    const ms = trigger - now;
-    setTimeout(() => {
-      try { new Notification('Project 80 – '+r.label, { body:'Time: '+r.time, icon:'/icon-192.png' }); } catch {}
-    }, ms);
+function renderReminders() {
+  const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  document.getElementById('notif-prompt').classList.toggle('hidden', granted);
+
+  document.getElementById('reminder-list').innerHTML = reminders.map(r => `
+    <div class="reminder-row">
+      <div class="reminder-time">${r.time}</div>
+      <div class="reminder-label">${r.label}</div>
+      <button class="toggle ${r.on?'on':'off'}" onclick="toggleReminder(${r.id})"></button>
+    </div>`).join('');
+}
+
+function toggleReminder(id) {
+  reminders = reminders.map(r => r.id===id?{...r,on:!r.on}:r);
+  save('reminders', reminders);
+  renderReminders();
+}
+
+function renderDataSummary() {
+  document.getElementById('data-summary-grid').innerHTML = `
+    <div class="stat-tile"><div class="stat-label">Weight</div><div class="stat-val">${weights.length}</div></div>
+    <div class="stat-tile"><div class="stat-label">Activity</div><div class="stat-val">${activities.length}</div></div>
+    <div class="stat-tile"><div class="stat-label">Nutrition</div><div class="stat-val">${nutrition.length}</div></div>`;
+}
+
+function requestNotifications() {
+  if (typeof Notification === 'undefined') { showToast('Notifications not supported'); return; }
+  Notification.requestPermission().then(p => {
+    showToast(p==='granted'?'✅ Notifications enabled!':'❌ Notifications denied');
+    if (p==='granted') scheduleReminders();
+    renderReminders();
   });
 }
 
-/* ─── Seed demo data on first launch ─── */
-function seedDemoData() {
-  if (load('seeded_v1', false)) return;
-  // Seed 30 days of weight entries showing a downward trend
-  const baseWeight = 99.9;
-  const weightEntries = [];
-  for (let i = 30; i >= 0; i--) {
-    const date = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
-    const trend = (30 - i) * 0.11; // ~0.11 kg/day loss trend
-    const noise = (Math.random() - 0.4) * 0.4; // slight random variation
-    const weight = +(baseWeight - trend + noise).toFixed(1);
-    weightEntries.push({ id: Date.now() + i, date, weight, bodyFat: null, waist: null });
-  }
-  save('weights', weightEntries);
+function scheduleReminders() {
+  if (typeof Notification==='undefined'||Notification.permission!=='granted') return;
+  reminders.filter(r=>r.on).forEach(r => {
+    const [h,mn] = r.time.split(':').map(Number);
+    const now = new Date();
+    const trigger = new Date(now);
+    trigger.setHours(h,mn,0,0);
+    if (trigger<=now) trigger.setDate(trigger.getDate()+1);
+    const ms = trigger-now;
+    setTimeout(()=>{ try{new Notification('Project 80 – '+r.label,{body:'Time: '+r.time})}catch{} }, ms);
+  });
+}
 
-  // Seed some cycling activities
-  const cycleActs = [
-    { id:1001, type:'Cycling', date: dayjs().subtract(2,'day').format('YYYY-MM-DD'), duration:45, distance:18.5, speed:24.7, elevation:120, calories:380, notes:'Morning ride' },
-    { id:1002, type:'Cycling', date: dayjs().subtract(5,'day').format('YYYY-MM-DD'), duration:60, distance:25.2, speed:25.2, elevation:180, calories:510, notes:'Long ride' },
-    { id:1003, type:'Kettlebell', date: dayjs().subtract(3,'day').format('YYYY-MM-DD'), duration:30, kettlebellWeight:16, exercises:'Swings, Cleans, Press', calories:280, notes:'' },
-    { id:1004, type:'Walking', date: dayjs().subtract(1,'day').format('YYYY-MM-DD'), duration:35, steps:5200, calories:180, notes:'Evening walk' },
+// ── Export / Import ───────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify({weights,activities,nutrition,habits},null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='project80_backup.json'; a.click();
+  showToast('📦 JSON exported');
+}
+function exportCSV() {
+  const rows = [['Date','Weight','Body Fat %','Waist cm'],...sortedWeights().map(w=>[w.date,w.weight,w.bodyFat||'',w.waist||''])];
+  const blob = new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='project80_weight.csv'; a.click();
+  showToast('📊 CSV exported');
+}
+function importData() {
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+  inp.onchange = e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if(data.weights)    { weights=data.weights;       save('weights',weights); }
+        if(data.activities) { activities=data.activities; save('activities',activities); }
+        if(data.nutrition)  { nutrition=data.nutrition;   save('nutrition',nutrition); }
+        if(data.habits)     { habits=data.habits;         save('habits',habits); }
+        showToast('✅ Data imported — refreshing…');
+        setTimeout(()=>renderPage(currentPage), 500);
+      } catch { showToast('❌ Invalid file'); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
+// ── Utilities ────────────────────────────────────────────────
+function dateDiffDays(a, b) {
+  const da = new Date(a), db = new Date(b);
+  return Math.round((db-da)/86400000);
+}
+
+function defaultReminders() {
+  return [
+    {id:1,  time:'07:00', label:'Weigh yourself',                       on:true},
+    {id:2,  time:'07:05', label:'Jeera water',                          on:true},
+    {id:3,  time:'07:10', label:'Almonds and flax seeds',               on:true},
+    {id:4,  time:'13:00', label:'Lunch time',                           on:true},
+    {id:5,  time:'17:00', label:'Workout preparation',                  on:true},
+    {id:6,  time:'18:00', label:'Workout',                              on:true},
+    {id:7,  time:'19:30', label:'Whey protein',                         on:true},
+    {id:8,  time:'21:00', label:'Dinner',                               on:true},
+    {id:9,  time:'22:30', label:'Prepare clothes and gear for tomorrow', on:true},
+    {id:10, time:'23:00', label:'Cinnamon water',                       on:true},
   ];
-  save('activities', cycleActs);
-
-  // Seed today's habits partially
-  const todayHabits = { weighed:true, jeera:true, almonds2:true, lunch:false, water:false, h_cycling:false, h_kettlebell:false, h_football:false, h_walk:false, whey2:false, dinner2:false, clothes:false, cinnamon2:false };
-  save('habits', { [dayjs().format('YYYY-MM-DD')]: todayHabits });
-
-  save('seeded_v1', true);
 }
 
+// ── Seed demo data ────────────────────────────────────────────
+function seedDemoData() {
+  if (load('seeded_v2', false)) return;
+  const entries = [];
+  for (let i=30; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const dateStr = d.toISOString().slice(0,10);
+    const trend   = (30-i)*0.11;
+    const noise   = (Math.random()-0.4)*0.4;
+    const weight  = +(START_WEIGHT - trend + noise).toFixed(1);
+    entries.push({id:(Date.now()+i).toString(), date:dateStr, weight, bodyFat:null, waist:null});
+  }
+  weights = entries; save('weights', weights);
+
+  activities = [
+    {id:1001,type:'Cycling',   date:new Date(Date.now()-2*86400000).toISOString().slice(0,10),duration:45,distance:18.5,speed:24.7,elevation:120,calories:380,notes:'Morning ride'},
+    {id:1002,type:'Cycling',   date:new Date(Date.now()-5*86400000).toISOString().slice(0,10),duration:60,distance:25.2,speed:25.2,elevation:180,calories:510,notes:'Long ride'},
+    {id:1003,type:'Kettlebell',date:new Date(Date.now()-3*86400000).toISOString().slice(0,10),duration:30,kbweight:16,exercises:'Swings, Cleans, Press',calories:280,notes:''},
+    {id:1004,type:'Walking',   date:new Date(Date.now()-86400000).toISOString().slice(0,10),  duration:35,steps:5200,calories:180,notes:'Evening walk'},
+  ]; save('activities', activities);
+
+  const todayH = {};
+  ['weighed','jeera_h','almonds_h'].forEach(id => { todayH[id]=true; });
+  habits = {[todayStr()]:todayH}; save('habits', habits);
+  save('seeded_v2', true);
+}
+
+// ── Init ──────────────────────────────────────────────────────
 seedDemoData();
-
-/* ─── Boot ─── */
-const savedReminders = load('reminders', defaultReminders());
-if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-  scheduleReminders(savedReminders);
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+scheduleReminders();
+renderPage('dashboard');
 </script>
 </body>
 </html>
