@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1951,39 +1952,391 @@ function downloadJSON(data, filename) {
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
 }
+// ── Legacy v1 nutrition conversion ───────────────────────
+// Maps old checkbox-based meal keys to human-readable descriptions.
+const LEGACY_NUT_LABELS = {
+  // Breakfast
+  jeera:      { desc:'Jeera Water',      meal:'Breakfast' },
+  almonds:    { desc:'Almonds',          meal:'Breakfast' },
+  flax:       { desc:'Flax Seeds',       meal:'Breakfast' },
+  // Lunch
+  eggs:       { desc:'Eggs',             meal:'Lunch' },
+  chicken_l:  { desc:'Chicken',          meal:'Lunch' },
+  other_l:    { desc:'Other',            meal:'Lunch' },
+  // Snack
+  fruit:      { desc:'Fruit',            meal:'Snack' },
+  whey:       { desc:'Whey Protein',     meal:'Snack' },
+  // Dinner
+  chicken_d:  { desc:'Chicken',          meal:'Dinner' },
+  other_d:    { desc:'Other',            meal:'Dinner' },
+  // Night  (the old v1 schema used 🫖 Night as meal key)
+  cinnamon:   { desc:'Cinnamon Water',   meal:'Late Night' },
+  date_fruit: { desc:'Date',             meal:'Late Night' },
+};
+
+// Maps old meal-section headings (including emoji) to canonical names.
+const LEGACY_MEAL_SECTION_MAP = {
+  '🌅 Breakfast': 'Breakfast',
+  '☀️ Lunch':    'Lunch',
+  '🍎 Snack':    'Snack',
+  '🌙 Dinner':   'Dinner',
+  '🫖 Night':    'Late Night',
+  // plain versions just in case
+  'Breakfast': 'Breakfast',
+  'Lunch':     'Lunch',
+  'Snack':     'Snack',
+  'Dinner':    'Dinner',
+  'Night':     'Late Night',
+  'Late Night':'Late Night',
+};
+
+function convertLegacyNutrition(legacyEntry, pid) {
+  // legacyEntry.meals is  { '🌅 Breakfast': { jeera: true, almonds: true }, ... }
+  // We convert each truthy key into a v2 meal entry row.
+  const newMeals = {};
+  const rawMeals = legacyEntry.meals || {};
+
+  for (const [sectionKey, items] of Object.entries(rawMeals)) {
+    // items may be an object of { id: bool } (old format) or already an array (v2)
+    if (Array.isArray(items)) {
+      // Already v2 format — just remap section name
+      const canonical = LEGACY_MEAL_SECTION_MAP[sectionKey] || sectionKey;
+      if (!newMeals[canonical]) newMeals[canonical] = [];
+      newMeals[canonical].push(...items);
+      continue;
+    }
+    // Old checkbox format
+    for (const [itemId, checked] of Object.entries(items)) {
+      if (!checked) continue;
+      const mapping = LEGACY_NUT_LABELS[itemId];
+      const mealSlot = mapping
+        ? mapping.meal
+        : (LEGACY_MEAL_SECTION_MAP[sectionKey] || 'Breakfast');
+      const desc = mapping ? mapping.desc : itemId;
+      if (!newMeals[mealSlot]) newMeals[mealSlot] = [];
+      newMeals[mealSlot].push({ meal: mealSlot, desc, protein: 0, calories: 0, notes: '' });
+    }
+  }
+
+  const dateStr = legacyEntry.date || '';
+  return {
+    id:         'n-' + pid + '-' + dateStr.replace(/-/g, ''),
+    profile_id: pid,
+    date:       dateStr,
+    meals:      newMeals,
+    water:      legacyEntry.water   || 0,
+    cheat:      legacyEntry.cheat   || false,
+    alcohol:    legacyEntry.alcohol || false,
+  };
+}
+
+// ── Legacy v1 habit-key → habit-definition-id mapping ────
+// The old system used free-form keys like "weighed", "jeera_h".
+// Map them to the default habit definition IDs so completions
+// continue to light up the right rows.
+const LEGACY_HABIT_KEY_MAP = {
+  weighed:      'hd-weigh',
+  jeera_h:      'hd-jeera',
+  almonds_h:    'hd-almonds',
+  almonds2:     'hd-almonds',
+  jeera:        'hd-jeera',
+  lunch_h:      'hd-lunch',
+  water_h:      null,            // no direct equivalent — skip
+  h_cycling:    'hd-cycling',
+  h_kettlebell: 'hd-kettlebell',
+  h_football:   'hd-football',
+  h_walk:       'hd-walk',
+  whey_h:       'hd-whey',
+  whey2:        'hd-whey',
+  dinner_h:     'hd-dinner',
+  dinner2:      'hd-dinner',
+  clothes_h:    'hd-clothes',
+  cinnamon_h:   'hd-cinnamon',
+  cinnamon2:    'hd-cinnamon',
+};
+
+function convertLegacyHabits(legacyHabitsMap) {
+  // legacyHabitsMap: { 'YYYY-MM-DD': { weighed: true, jeera_h: true, ... }, ... }
+  const result = {};
+  for (const [date, completions] of Object.entries(legacyHabitsMap)) {
+    const newCompletions = {};
+    for (const [oldKey, val] of Object.entries(completions)) {
+      if (!val) continue;
+      if (LEGACY_HABIT_KEY_MAP[oldKey] !== undefined) {
+        const newId = LEGACY_HABIT_KEY_MAP[oldKey];
+        if (newId) newCompletions[newId] = true;
+      } else {
+        // Unknown key — keep it as-is so no data is silently dropped
+        newCompletions[oldKey] = val;
+      }
+    }
+    result[date] = newCompletions;
+  }
+  return result;
+}
+
+// ── Main import function (all three formats) ─────────────
 function importData() {
-  const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json';
   inp.onchange = e => {
-    const file = e.target.files[0]; if(!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target.result);
-        // Single profile export
-        if (data.profile && data.weights) {
-          const pid = data.profile;
-          if (!DB[pid]) { showToast('Unknown profile'); return; }
-          if (data.weights)    DB[pid].weights    = data.weights;
-          if (data.activities) DB[pid].activities = data.activities;
-          if (data.nutrition)  DB[pid].nutrition  = data.nutrition;
-          if (data.habits)     DB[pid].habits      = data.habits;
-          if (data.habitDefs)  DB[pid].habitDefs   = data.habitDefs;
-          saveLocalCache(pid);
-          showToast('✅ '+pid+' data imported');
-        }
-        // All-profiles export
-        else if (data.kaveesh || data.mitali) {
-          for (const pid of ['kaveesh','mitali']) {
-            if (data[pid]) { Object.assign(DB[pid], data[pid]); saveLocalCache(pid); }
-          }
-          showToast('✅ All profiles imported');
-        }
-        renderPage(currentPage);
-      } catch { showToast('❌ Invalid backup file'); }
+        await runImport(data);
+      } catch (err) {
+        console.error('Import parse error:', err);
+        showToast('❌ Invalid backup file: ' + err.message);
+      }
     };
     reader.readAsText(file);
   };
   inp.click();
+}
+
+async function runImport(data) {
+  // ── Detect format ──────────────────────────────────────
+  const isV2Single  = !!(data.profile && (data.weights || data.activities || data.nutrition || data.habits));
+  const isV2All     = !!(data.kaveesh || data.mitali) && !data.profile;
+  const isLegacyV1  = !isV2Single && !isV2All && (data.weights || data.activities || data.nutrition || data.habits);
+
+  if (!isV2Single && !isV2All && !isLegacyV1) {
+    showToast('❌ Unrecognised backup format');
+    return;
+  }
+
+  showToast('Importing…');
+
+  try {
+    if (isV2Single) {
+      await importV2SingleProfile(data);
+    } else if (isV2All) {
+      await importV2AllProfiles(data);
+    } else {
+      await importLegacyV1(data);
+    }
+  } catch (err) {
+    console.error('Import error:', err);
+    showToast('❌ Import failed: ' + err.message);
+    return;
+  }
+
+  renderPage(currentPage);
+}
+
+// ── Format 1: v2 single-profile ───────────────────────────
+async function importV2SingleProfile(data) {
+  const pid = data.profile;
+  if (!DB[pid]) { showToast('❌ Unknown profile: ' + pid); return; }
+
+  let wCount = 0, aCount = 0, nCount = 0, hCount = 0;
+
+  if (data.weights) {
+    const byDate = new Map(DB[pid].weights.map(w => [w.date, w]));
+    (data.weights || []).forEach(w => { byDate.set(w.date, {...w, profile_id:pid}); wCount++; });
+    DB[pid].weights = [...byDate.values()];
+  }
+  if (data.activities) {
+    const byId = new Map(DB[pid].activities.map(a => [a.id, a]));
+    (data.activities || []).forEach(a => { if (!byId.has(a.id)) { byId.set(a.id, {...a, profile_id:pid}); aCount++; } });
+    DB[pid].activities = [...byId.values()];
+  }
+  if (data.nutrition) {
+    const byDate = new Map(DB[pid].nutrition.map(n => [n.date, n]));
+    (data.nutrition || []).forEach(n => { byDate.set(n.date, {...n, profile_id:pid}); nCount++; });
+    DB[pid].nutrition = [...byDate.values()];
+  }
+  if (data.habits) {
+    DB[pid].habits = { ...data.habits, ...DB[pid].habits };
+    hCount = Object.keys(data.habits).length;
+  }
+  if (data.habitDefs && data.habitDefs.length) DB[pid].habitDefs = data.habitDefs;
+  if (data.settings)  DB[pid].settings = { ...defaultSettings(pid), ...data.settings };
+
+  saveLocalCache(pid);
+  showToast(`Imported ${wCount}w ${aCount}a ${nCount}n ${hCount}h — syncing…`);
+  await pushImportedDataToSupabase(pid);
+  showToast(`✅ Import complete — synced (${PROFILES[pid]?.name || pid})`);
+}
+
+// ── Format 2: v2 all-profiles ─────────────────────────────
+async function importV2AllProfiles(data) {
+  let total = 0;
+  for (const pid of ['kaveesh', 'mitali']) {
+    if (!data[pid]) continue;
+    const d = data[pid];
+    if (d.weights)    { DB[pid].weights    = d.weights;    total += d.weights.length; }
+    if (d.activities) { DB[pid].activities = d.activities; total += d.activities.length; }
+    if (d.nutrition)  { DB[pid].nutrition  = d.nutrition; }
+    if (d.habits)     { DB[pid].habits     = d.habits; }
+    if (d.habitDefs && d.habitDefs.length) DB[pid].habitDefs = d.habitDefs;
+    if (d.settings)   DB[pid].settings = { ...defaultSettings(pid), ...d.settings };
+    saveLocalCache(pid);
+  }
+  showToast('Imported both profiles — syncing…');
+  for (const pid of ['kaveesh', 'mitali']) {
+    if (data[pid]) await pushImportedDataToSupabase(pid);
+  }
+  showToast('✅ All profiles imported and synced');
+}
+
+// ── Format 3: Legacy v1 (belongs to Kaveesh) ─────────────
+async function importLegacyV1(data) {
+  const pid = 'kaveesh';
+  let wCount = 0, aCount = 0, nCount = 0, hCount = 0;
+
+  // ── Weights: merge by date, prefer legacy if conflict
+  if (data.weights && data.weights.length) {
+    const byDate = new Map(DB[pid].weights.map(w => [w.date, w]));
+    for (const w of data.weights) {
+      // Prefer legacy record (may have bodyFat etc that seed data lacks)
+      const dateKey = w.date;
+      const existing = byDate.get(dateKey);
+      const legacyHasExtra = w.bodyFat != null || w.waist != null;
+      if (!existing || legacyHasExtra) {
+        byDate.set(dateKey, {
+          id:         'w-' + pid + '-' + dateKey.replace(/-/g, ''),
+          date:       dateKey,
+          weight:     w.weight,
+          bodyFat:    w.bodyFat  ?? null,
+          waist:      w.waist    ?? null,
+          profile_id: pid,
+        });
+        wCount++;
+      }
+    }
+    DB[pid].weights = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
+  }
+
+  // ── Activities: merge by id, no duplicates
+  if (data.activities && data.activities.length) {
+    const byId = new Map(DB[pid].activities.map(a => [String(a.id), a]));
+    for (const a of data.activities) {
+      const key = String(a.id);
+      if (!byId.has(key)) {
+        byId.set(key, { ...a, profile_id: pid });
+        aCount++;
+      }
+    }
+    DB[pid].activities = [...byId.values()];
+  }
+
+  // ── Nutrition: convert legacy format, merge by date
+  if (data.nutrition && data.nutrition.length) {
+    const byDate = new Map(DB[pid].nutrition.map(n => [n.date, n]));
+    for (const legacyN of data.nutrition) {
+      const converted = convertLegacyNutrition(legacyN, pid);
+      if (!byDate.has(converted.date)) {
+        byDate.set(converted.date, converted);
+        nCount++;
+      } else {
+        // Merge meals into existing entry, don't overwrite
+        const existing = byDate.get(converted.date);
+        for (const [mealSlot, entries] of Object.entries(converted.meals)) {
+          if (!existing.meals[mealSlot]) existing.meals[mealSlot] = [];
+          existing.meals[mealSlot].push(...entries);
+        }
+        // Also carry over water/cheat/alcohol if existing has none
+        if (!existing.water && converted.water) existing.water = converted.water;
+        if (!existing.cheat && converted.cheat) existing.cheat = converted.cheat;
+        if (!existing.alcohol && converted.alcohol) existing.alcohol = converted.alcohol;
+        byDate.set(converted.date, existing);
+        nCount++;
+      }
+    }
+    DB[pid].nutrition = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
+  }
+
+  // ── Habits: convert old keys, merge by date (existing wins for same date)
+  if (data.habits && typeof data.habits === 'object') {
+    const converted = convertLegacyHabits(data.habits);
+    for (const [date, completions] of Object.entries(converted)) {
+      if (!DB[pid].habits[date]) {
+        // No existing data for this date — use legacy
+        DB[pid].habits[date] = completions;
+        hCount++;
+      } else {
+        // Merge: add any legacy completions not already present
+        for (const [hId, val] of Object.entries(completions)) {
+          if (!(hId in DB[pid].habits[date])) {
+            DB[pid].habits[date][hId] = val;
+          }
+        }
+        hCount++;
+      }
+    }
+  }
+
+  saveLocalCache(pid);
+  showToast(`Imported ${wCount} weights, ${aCount} activities, ${nCount} nutrition days and ${hCount} habit days — syncing to cloud…`);
+  await pushImportedDataToSupabase(pid);
+  showToast('✅ Import complete — synced');
+}
+
+// ── Push all local data for a profile to Supabase ─────────
+// Upserts every record so re-importing is safe (idempotent).
+async function pushImportedDataToSupabase(pid) {
+  if (!sb) { console.warn('No Supabase client — skipping cloud sync'); return; }
+
+  const d = DB[pid];
+  const errors = [];
+
+  // Weights
+  for (const w of d.weights) {
+    const { error } = await sb.from('weights').upsert({ ...w, profile_id: pid });
+    if (error) errors.push('weight ' + w.date + ': ' + error.message);
+  }
+
+  // Activities (push in batches of 20 to stay within rate limits)
+  const acts = d.activities;
+  for (let i = 0; i < acts.length; i += 20) {
+    const batch = acts.slice(i, i + 20).map(a => ({ ...a, profile_id: pid }));
+    const { error } = await sb.from('activities').upsert(batch);
+    if (error) errors.push('activities batch: ' + error.message);
+  }
+
+  // Nutrition
+  for (const n of d.nutrition) {
+    const { error } = await sb.from('nutrition').upsert({ ...n, profile_id: pid });
+    if (error) errors.push('nutrition ' + n.date + ': ' + error.message);
+  }
+
+  // Habits — one row per date
+  for (const [date, completions] of Object.entries(d.habits)) {
+    const row = {
+      id:          'h-' + pid + '-' + date.replace(/-/g, ''),
+      profile_id:  pid,
+      date,
+      completions,
+    };
+    const { error } = await sb.from('habits').upsert(row);
+    if (error) errors.push('habits ' + date + ': ' + error.message);
+  }
+
+  // Habit definitions
+  for (const hd of d.habitDefs) {
+    const { error } = await sb.from('habit_definitions').upsert({ ...hd, profile_id: pid });
+    if (error) errors.push('habitDef ' + hd.id + ': ' + error.message);
+  }
+
+  // Settings
+  const { error: sErr } = await sb.from('settings').upsert({
+    id:         's-' + pid,
+    profile_id: pid,
+    data:       d.settings,
+  });
+  if (sErr) errors.push('settings: ' + sErr.message);
+
+  if (errors.length) {
+    console.error('Import sync errors:', errors);
+    showToast('⚠️ Synced with ' + errors.length + ' error(s) — check console');
+  } else {
+    setSyncStatus('ok');
+  }
 }
 
 // ══ CHART FACTORY ════════════════════════════════════════
