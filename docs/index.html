@@ -2136,51 +2136,82 @@ async function importV2SingleProfile(data) {
 
   if (data.weights) {
     const byDate = new Map(DB[pid].weights.map(w => [w.date, w]));
-    (data.weights || []).forEach(w => { byDate.set(w.date, {...w, profile_id:pid}); wCount++; });
-    DB[pid].weights = [...byDate.values()];
+    (data.weights || []).forEach(w => {
+      byDate.set(w.date, { ...w, profile_id: pid, id: w.id || ('w-' + pid + '-' + w.date.replace(/-/g,'')) });
+      wCount++;
+    });
+    DB[pid].weights = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
   }
   if (data.activities) {
-    const byId = new Map(DB[pid].activities.map(a => [a.id, a]));
-    (data.activities || []).forEach(a => { if (!byId.has(a.id)) { byId.set(a.id, {...a, profile_id:pid}); aCount++; } });
+    const byId = new Map(DB[pid].activities.map(a => [String(a.id), a]));
+    (data.activities || []).forEach(a => {
+      const key = String(a.id);
+      if (!byId.has(key)) { byId.set(key, { ...a, id: key, profile_id: pid }); aCount++; }
+    });
     DB[pid].activities = [...byId.values()];
   }
   if (data.nutrition) {
     const byDate = new Map(DB[pid].nutrition.map(n => [n.date, n]));
-    (data.nutrition || []).forEach(n => { byDate.set(n.date, {...n, profile_id:pid}); nCount++; });
-    DB[pid].nutrition = [...byDate.values()];
+    (data.nutrition || []).forEach(n => {
+      byDate.set(n.date, { ...n, profile_id: pid, id: n.id || ('n-' + pid + '-' + n.date.replace(/-/g,'')) });
+      nCount++;
+    });
+    DB[pid].nutrition = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
   }
   if (data.habits) {
     DB[pid].habits = { ...data.habits, ...DB[pid].habits };
     hCount = Object.keys(data.habits).length;
   }
   if (data.habitDefs && data.habitDefs.length) DB[pid].habitDefs = data.habitDefs;
-  if (data.settings)  DB[pid].settings = { ...defaultSettings(pid), ...data.settings };
+  if (data.settings) DB[pid].settings = { ...defaultSettings(pid), ...data.settings };
 
   saveLocalCache(pid);
+
   showToast(`Imported ${wCount}w ${aCount}a ${nCount}n ${hCount}h — syncing…`);
-  await pushImportedDataToSupabase(pid);
+  const result = await pushImportedDataToSupabase(pid, { wCount, aCount, nCount, hCount });
+
+  if (!result.success) {
+    console.error('Import sync errors:', result.errors);
+    showToast('❌ Import failed — ' + result.errors.length + ' records could not be synced. Check console.');
+    return;
+  }
+
+  // Re-load from Supabase so UI reflects cloud state, not just local merge
+  await loadProfileFromSupabase(pid);
+  saveLocalCache(pid);
   showToast(`✅ Import complete — synced (${PROFILES[pid]?.name || pid})`);
 }
 
 // ── Format 2: v2 all-profiles ─────────────────────────────
 async function importV2AllProfiles(data) {
-  let total = 0;
   for (const pid of ['kaveesh', 'mitali']) {
     if (!data[pid]) continue;
     const d = data[pid];
-    if (d.weights)    { DB[pid].weights    = d.weights;    total += d.weights.length; }
-    if (d.activities) { DB[pid].activities = d.activities; total += d.activities.length; }
-    if (d.nutrition)  { DB[pid].nutrition  = d.nutrition; }
-    if (d.habits)     { DB[pid].habits     = d.habits; }
+    if (d.weights)    DB[pid].weights    = (d.weights    || []).map(w => ({ ...w, profile_id: pid, id: w.id || ('w-'+pid+'-'+w.date.replace(/-/g,'')) }));
+    if (d.activities) DB[pid].activities = (d.activities || []).map(a => ({ ...a, id: String(a.id), profile_id: pid }));
+    if (d.nutrition)  DB[pid].nutrition  = (d.nutrition  || []).map(n => ({ ...n, profile_id: pid, id: n.id || ('n-'+pid+'-'+n.date.replace(/-/g,'')) }));
+    if (d.habits)     DB[pid].habits     = d.habits;
     if (d.habitDefs && d.habitDefs.length) DB[pid].habitDefs = d.habitDefs;
-    if (d.settings)   DB[pid].settings = { ...defaultSettings(pid), ...d.settings };
+    if (d.settings)   DB[pid].settings   = { ...defaultSettings(pid), ...d.settings };
     saveLocalCache(pid);
   }
-  showToast('Imported both profiles — syncing…');
+
+  showToast('Importing both profiles — syncing…');
+  const allErrors = [];
   for (const pid of ['kaveesh', 'mitali']) {
-    if (data[pid]) await pushImportedDataToSupabase(pid);
+    if (!data[pid]) continue;
+    const result = await pushImportedDataToSupabase(pid, {});
+    if (!result.success) allErrors.push(...result.errors);
+    await loadProfileFromSupabase(pid);
+    saveLocalCache(pid);
   }
-  showToast('✅ All profiles imported and synced');
+
+  if (allErrors.length) {
+    console.error('Import sync errors:', allErrors);
+    showToast('❌ Import failed — ' + allErrors.length + ' records could not be synced. Check console.');
+  } else {
+    showToast('✅ Both profiles imported and synced');
+  }
 }
 
 // ── Format 3: Legacy v1 (belongs to Kaveesh) ─────────────
@@ -2188,14 +2219,13 @@ async function importLegacyV1(data) {
   const pid = 'kaveesh';
   let wCount = 0, aCount = 0, nCount = 0, hCount = 0;
 
-  // ── Weights: merge by date, prefer legacy if conflict
+  // ── Weights: merge by date, prefer legacy when it has body-fat/waist
   if (data.weights && data.weights.length) {
     const byDate = new Map(DB[pid].weights.map(w => [w.date, w]));
     for (const w of data.weights) {
-      // Prefer legacy record (may have bodyFat etc that seed data lacks)
       const dateKey = w.date;
       const existing = byDate.get(dateKey);
-      const legacyHasExtra = w.bodyFat != null || w.waist != null;
+      const legacyHasExtra = (w.bodyFat != null) || (w.waist != null);
       if (!existing || legacyHasExtra) {
         byDate.set(dateKey, {
           id:         'w-' + pid + '-' + dateKey.replace(/-/g, ''),
@@ -2211,20 +2241,20 @@ async function importLegacyV1(data) {
     DB[pid].weights = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
   }
 
-  // ── Activities: merge by id, no duplicates
+  // ── Activities: merge by id (coerce to string), no duplicates
   if (data.activities && data.activities.length) {
     const byId = new Map(DB[pid].activities.map(a => [String(a.id), a]));
     for (const a of data.activities) {
       const key = String(a.id);
       if (!byId.has(key)) {
-        byId.set(key, { ...a, profile_id: pid });
+        byId.set(key, { ...a, id: key, profile_id: pid });
         aCount++;
       }
     }
     DB[pid].activities = [...byId.values()];
   }
 
-  // ── Nutrition: convert legacy format, merge by date
+  // ── Nutrition: convert legacy checkbox format, merge by date
   if (data.nutrition && data.nutrition.length) {
     const byDate = new Map(DB[pid].nutrition.map(n => [n.date, n]));
     for (const legacyN of data.nutrition) {
@@ -2233,15 +2263,13 @@ async function importLegacyV1(data) {
         byDate.set(converted.date, converted);
         nCount++;
       } else {
-        // Merge meals into existing entry, don't overwrite
         const existing = byDate.get(converted.date);
-        for (const [mealSlot, entries] of Object.entries(converted.meals)) {
-          if (!existing.meals[mealSlot]) existing.meals[mealSlot] = [];
-          existing.meals[mealSlot].push(...entries);
+        for (const [slot, entries] of Object.entries(converted.meals)) {
+          if (!existing.meals[slot]) existing.meals[slot] = [];
+          existing.meals[slot].push(...entries);
         }
-        // Also carry over water/cheat/alcohol if existing has none
-        if (!existing.water && converted.water) existing.water = converted.water;
-        if (!existing.cheat && converted.cheat) existing.cheat = converted.cheat;
+        if (!existing.water   && converted.water)   existing.water   = converted.water;
+        if (!existing.cheat   && converted.cheat)   existing.cheat   = converted.cheat;
         if (!existing.alcohol && converted.alcohol) existing.alcohol = converted.alcohol;
         byDate.set(converted.date, existing);
         nCount++;
@@ -2250,92 +2278,242 @@ async function importLegacyV1(data) {
     DB[pid].nutrition = [...byDate.values()].sort((a,b) => a.date < b.date ? -1 : 1);
   }
 
-  // ── Habits: convert old keys, merge by date (existing wins for same date)
+  // ── Habits: convert old keys, merge by date
   if (data.habits && typeof data.habits === 'object') {
     const converted = convertLegacyHabits(data.habits);
     for (const [date, completions] of Object.entries(converted)) {
       if (!DB[pid].habits[date]) {
-        // No existing data for this date — use legacy
         DB[pid].habits[date] = completions;
         hCount++;
       } else {
-        // Merge: add any legacy completions not already present
         for (const [hId, val] of Object.entries(completions)) {
-          if (!(hId in DB[pid].habits[date])) {
-            DB[pid].habits[date][hId] = val;
-          }
+          if (!(hId in DB[pid].habits[date])) DB[pid].habits[date][hId] = val;
         }
         hCount++;
       }
     }
   }
 
+  // ── Capture the exact dates/IDs that were imported, for verification ──
+  // These sets are built from the merge loops above — they contain only
+  // the records that actually made it into DB[pid] from the legacy file.
+  const importedWeightDates   = new Set(
+    (data.weights || [])
+      .filter(w => {
+        // A weight was imported if it either had no prior entry, or had extra data
+        const prior = DB[pid].weights.find(x => x.date === w.date);
+        return prior !== undefined; // it's in the merged array → it was processed
+      })
+      .map(w => w.date)
+  );
+  const importedActivityIds   = new Set(
+    DB[pid].activities
+      .filter(a => (data.activities || []).some(la => String(la.id) === String(a.id)))
+      .map(a => String(a.id))
+  );
+  const importedNutritionDates = new Set(
+    (data.nutrition || []).map(n => n.date).filter(d => d)
+  );
+  const importedHabitDates    = new Set(
+    Object.keys(data.habits || {})
+  );
+
+  // 1. Persist merged data to localStorage immediately
   saveLocalCache(pid);
-  showToast(`Imported ${wCount} weights, ${aCount} activities, ${nCount} nutrition days and ${hCount} habit days — syncing to cloud…`);
-  await pushImportedDataToSupabase(pid);
-  showToast('✅ Import complete — synced');
+
+  showToast(`Imported ${wCount} weights, ${aCount} activities, ${nCount} nutrition days, ${hCount} habit days — syncing to cloud…`);
+
+  // 2. Push everything to Supabase with correct conflict targets
+  const result = await pushImportedDataToSupabase(pid, { wCount, aCount, nCount, hCount });
+
+  if (!result.success) {
+    console.error('Import sync errors:', result.errors);
+    showToast('❌ Import failed — ' + result.errors.length + ' record(s) could not be synced. Check console for details.');
+    return;
+  }
+
+  // 3. Re-load Kaveesh's data FROM Supabase — not from local cache
+  showToast('Verifying cloud data…');
+  await loadProfileFromSupabase(pid);
+
+  // 4. Per-record verification against the freshly loaded Supabase data
+  const missingWeights    = [];
+  const missingActivities = [];
+  const missingNutrition  = [];
+  const missingHabits     = [];
+
+  // 4a. Weights — check every imported date is present in the reload
+  const reloadedWeightDates = new Set(DB[pid].weights.map(w => w.date));
+  for (const date of importedWeightDates) {
+    if (!reloadedWeightDates.has(date)) missingWeights.push(date);
+  }
+
+  // 4b. Activities — check every imported ID is present in the reload
+  const reloadedActivityIds = new Set(DB[pid].activities.map(a => String(a.id)));
+  for (const id of importedActivityIds) {
+    if (!reloadedActivityIds.has(id)) missingActivities.push(id);
+  }
+
+  // 4c. Nutrition — check every imported date is present in the reload
+  const reloadedNutritionDates = new Set(DB[pid].nutrition.map(n => n.date));
+  for (const date of importedNutritionDates) {
+    if (!reloadedNutritionDates.has(date)) missingNutrition.push(date);
+  }
+
+  // 4d. Habits — check every imported date is present in the reload
+  const reloadedHabitDates = new Set(Object.keys(DB[pid].habits));
+  for (const date of importedHabitDates) {
+    if (!reloadedHabitDates.has(date)) missingHabits.push(date);
+  }
+
+  const allMissing = [
+    ...missingWeights.map(d    => 'weight:'    + d),
+    ...missingActivities.map(id => 'activity:'  + id),
+    ...missingNutrition.map(d  => 'nutrition:'  + d),
+    ...missingHabits.map(d     => 'habit:'      + d),
+  ];
+
+  if (allMissing.length > 0) {
+    console.error('Import verification failed — missing records in Supabase:', allMissing);
+    showToast('❌ Cloud verification failed — some imported records are missing. Check console.');
+    return;
+  }
+
+  // 5. Save the freshly loaded Supabase data back to localStorage
+  saveLocalCache(pid);
+
+  showToast('✅ Import complete — synced and verified');
 }
 
-// ── Push all local data for a profile to Supabase ─────────
-// Upserts every record so re-importing is safe (idempotent).
-async function pushImportedDataToSupabase(pid) {
-  if (!sb) { console.warn('No Supabase client — skipping cloud sync'); return; }
+// ── Push all merged data for a profile to Supabase ────────
+// Returns { success: boolean, counts: {}, errors: string[] }
+// Uses explicit onConflict targets matching the DB schema.
+async function pushImportedDataToSupabase(pid, counts) {
+  if (!sb) {
+    const msg = 'No Supabase client — cannot sync to cloud';
+    console.warn(msg);
+    return { success: false, counts, errors: [msg] };
+  }
 
   const d = DB[pid];
   const errors = [];
 
-  // Weights
-  for (const w of d.weights) {
-    const { error } = await sb.from('weights').upsert({ ...w, profile_id: pid });
-    if (error) errors.push('weight ' + w.date + ': ' + error.message);
+  // ── Weights: UNIQUE (profile_id, date) ──────────────────
+  if (d.weights.length) {
+    const rows = d.weights.map(w => ({
+      id:         w.id || ('w-' + pid + '-' + w.date.replace(/-/g,'')),
+      profile_id: pid,
+      date:       w.date,
+      weight:     w.weight,
+      body_fat:   w.bodyFat   ?? null,   // DB column is body_fat (snake_case)
+      waist:      w.waist     ?? null,
+    }));
+    // Batch in groups of 50
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await sb.from('weights')
+        .upsert(batch, { onConflict: 'profile_id,date' });
+      if (error) {
+        console.error('weights upsert error:', error);
+        errors.push('weights[' + i + ']: ' + error.message);
+      }
+    }
   }
 
-  // Activities (push in batches of 20 to stay within rate limits)
-  const acts = d.activities;
-  for (let i = 0; i < acts.length; i += 20) {
-    const batch = acts.slice(i, i + 20).map(a => ({ ...a, profile_id: pid }));
-    const { error } = await sb.from('activities').upsert(batch);
-    if (error) errors.push('activities batch: ' + error.message);
+  // ── Activities: PRIMARY KEY (id) ─────────────────────────
+  if (d.activities.length) {
+    const rows = d.activities.map(a => ({
+      ...a,
+      id:         String(a.id),   // ensure TEXT, not integer
+      profile_id: pid,
+    }));
+    for (let i = 0; i < rows.length; i += 20) {
+      const batch = rows.slice(i, i + 20);
+      const { error } = await sb.from('activities')
+        .upsert(batch, { onConflict: 'id' });
+      if (error) {
+        console.error('activities upsert error:', error);
+        errors.push('activities[' + i + ']: ' + error.message);
+      }
+    }
   }
 
-  // Nutrition
-  for (const n of d.nutrition) {
-    const { error } = await sb.from('nutrition').upsert({ ...n, profile_id: pid });
-    if (error) errors.push('nutrition ' + n.date + ': ' + error.message);
+  // ── Nutrition: UNIQUE (profile_id, date) ─────────────────
+  if (d.nutrition.length) {
+    const rows = d.nutrition.map(n => ({
+      id:         n.id || ('n-' + pid + '-' + n.date.replace(/-/g,'')),
+      profile_id: pid,
+      date:       n.date,
+      meals:      n.meals    || {},
+      water:      n.water    || 0,
+      cheat:      n.cheat    || false,
+      alcohol:    n.alcohol  || false,
+    }));
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await sb.from('nutrition')
+        .upsert(batch, { onConflict: 'profile_id,date' });
+      if (error) {
+        console.error('nutrition upsert error:', error);
+        errors.push('nutrition[' + i + ']: ' + error.message);
+      }
+    }
   }
 
-  // Habits — one row per date
-  for (const [date, completions] of Object.entries(d.habits)) {
-    const row = {
+  // ── Habits: UNIQUE (profile_id, date) ────────────────────
+  const habitEntries = Object.entries(d.habits);
+  if (habitEntries.length) {
+    const rows = habitEntries.map(([date, completions]) => ({
       id:          'h-' + pid + '-' + date.replace(/-/g, ''),
       profile_id:  pid,
       date,
-      completions,
-    };
-    const { error } = await sb.from('habits').upsert(row);
-    if (error) errors.push('habits ' + date + ': ' + error.message);
+      completions: completions || {},
+    }));
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await sb.from('habits')
+        .upsert(batch, { onConflict: 'profile_id,date' });
+      if (error) {
+        console.error('habits upsert error:', error);
+        errors.push('habits[' + i + ']: ' + error.message);
+      }
+    }
   }
 
-  // Habit definitions
-  for (const hd of d.habitDefs) {
-    const { error } = await sb.from('habit_definitions').upsert({ ...hd, profile_id: pid });
-    if (error) errors.push('habitDef ' + hd.id + ': ' + error.message);
+  // ── Habit definitions: PRIMARY KEY (id) ──────────────────
+  if (d.habitDefs.length) {
+    const rows = d.habitDefs.map(hd => ({ ...hd, profile_id: pid }));
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await sb.from('habit_definitions')
+        .upsert(batch, { onConflict: 'id' });
+      if (error) {
+        console.error('habit_definitions upsert error:', error);
+        errors.push('habitDefs[' + i + ']: ' + error.message);
+      }
+    }
   }
 
-  // Settings
-  const { error: sErr } = await sb.from('settings').upsert({
-    id:         's-' + pid,
-    profile_id: pid,
-    data:       d.settings,
-  });
-  if (sErr) errors.push('settings: ' + sErr.message);
+  // ── Settings: UNIQUE (profile_id) ────────────────────────
+  {
+    const { error } = await sb.from('settings')
+      .upsert(
+        { id: 's-' + pid, profile_id: pid, data: d.settings },
+        { onConflict: 'profile_id' }
+      );
+    if (error) {
+      console.error('settings upsert error:', error);
+      errors.push('settings: ' + error.message);
+    }
+  }
 
-  if (errors.length) {
-    console.error('Import sync errors:', errors);
-    showToast('⚠️ Synced with ' + errors.length + ' error(s) — check console');
-  } else {
+  const success = errors.length === 0;
+  if (success) {
     setSyncStatus('ok');
+  } else {
+    setSyncStatus('error');
   }
+  return { success, counts, errors };
 }
 
 // ══ CHART FACTORY ════════════════════════════════════════
