@@ -5,10 +5,10 @@
 <meta name="theme-color" content="#0a0a0f"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Project 80"/>
-<meta name="description" content="Two-person fitness dashboard. Kaveesh & Mitali."/>
+<meta name="apple-mobile-web-app-title" content="Momentum"/>
+<meta name="description" content="Momentum — personal fitness & wellness dashboard."/>
 <link rel="manifest" href="manifest.json"/>
-<title>Project 80</title>
+<title>Momentum</title>
 
 <!-- ── Loading screen (shows instantly, removed when JS boots) ── -->
 <style>
@@ -29,27 +29,27 @@
 
 <div id="boot-screen">
   <div class="boot-logo">⚡</div>
-  <div class="boot-title">Project 80</div>
+  <div class="boot-title">Momentum</div>
   <div class="boot-sub">Loading your dashboard…</div>
   <div class="boot-spinner"></div>
 </div>
 
 <div id="error-screen">
   <div class="err-icon">⚠️</div>
-  <div class="err-title">Couldn't load Project 80</div>
+  <div class="err-title">Couldn't load Momentum</div>
   <div class="err-msg" id="error-detail">A required component failed to load. Please check your connection and try again.</div>
   <button onclick="location.reload()">Refresh</button>
 </div>
 
 <div id="app" style="display:none">
-<!-- Profile Switcher Banner -->
-<div id="profile-banner" style="background:#13131a;border-bottom:1px solid #2a2a3a;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;max-width:430px;margin:0 auto;width:100%">
-  <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7c6bff">Project 80</div>
-  <div style="display:flex;gap:6px">
-    <button id="profile-btn-kaveesh" class="profile-btn active" onclick="switchProfile('kaveesh')">Kaveesh</button>
-    <button id="profile-btn-mitali"  class="profile-btn"        onclick="switchProfile('mitali')">Mitali</button>
+<!-- Profile Switcher Banner (populated dynamically) -->
+<div id="profile-banner" style="background:#13131a;border-bottom:1px solid #2a2a3a;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;max-width:430px;margin:0 auto;width:100%;gap:8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7c6bff;white-space:nowrap">⚡ Momentum</div>
+  <div id="profile-switcher-btns" style="display:flex;gap:5px;overflow-x:auto;flex:1;justify-content:center"></div>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+    <button onclick="openCreateProfileModal(null)" style="background:none;border:1px dashed #2a2a3a;border-radius:20px;color:#6b6b80;font-size:11px;font-weight:600;padding:4px 8px;cursor:pointer;white-space:nowrap">+ New</button>
+    <div id="sync-indicator" class="sync-dot sync-idle" title="Sync status">●</div>
   </div>
-  <div id="sync-indicator" class="sync-dot sync-idle" title="Sync status">●</div>
 </div>
 
 <!-- Pages container -->
@@ -71,7 +71,11 @@
     <!-- Status badge -->
     <div id="dash-status-badge" class="status-badge status-unknown" style="margin-bottom:12px">LOADING</div>
 
-    <!-- Progress ring card -->
+    <!-- Today's Wins card -->
+    <div class="card" id="dash-wins-card" style="margin-bottom:12px">
+      <div class="card-title">🏅 Today's Wins</div>
+      <div id="dash-wins-content"></div>
+    </div>
     <div class="card" style="text-align:center;padding:20px 16px">
       <div style="width:160px;height:160px;position:relative;margin:0 auto 16px">
         <svg width="160" height="160" style="transform:rotate(-90deg);display:block">
@@ -185,22 +189,16 @@
   <!-- ══ ACTIVITY ══ -->
   <div class="page hidden" id="page-activity">
     <div class="page-header">
-      <div class="page-title">🚴 Activity</div>
+      <div class="page-title">🏋️ Activity</div>
       <button class="btn btn-primary btn-sm" onclick="openModal('modal-activity')">+ Log</button>
     </div>
     <div class="tabs" id="act-tabs">
       <button class="tab active" data-atab="act-log">Recent</button>
-      <button class="tab" data-atab="act-cycling">Cycling</button>
       <button class="tab" data-atab="act-stats">Stats</button>
     </div>
     <div id="act-log">
       <div id="act-log-list"></div>
       <div class="empty hidden" id="act-empty"><div class="empty-icon">🏃</div><div class="empty-text">No activities yet.\nTap + Log to add a workout.</div></div>
-    </div>
-    <div id="act-cycling" class="hidden">
-      <div class="grid-2" id="act-cyc-stats"></div>
-      <div class="section-label">Achievements</div>
-      <div id="act-cyc-badges"></div>
     </div>
     <div id="act-stats" class="hidden">
       <div class="grid-2" id="act-stat-grid"></div>
@@ -317,12 +315,10 @@
         <div id="settings-content"></div>
       </div>
       <div class="card">
-        <div class="card-title">About</div>
+        <div class="card-title">Install as App</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.7">
-          <div style="font-weight:600;color:var(--text);margin-bottom:4px">Project 80</div>
-          <div>Kaveesh: 99.9 kg → 80 kg · Jan 1, 2027</div>
-          <div>Mitali: — → 70 kg · Jan 1, 2027</div>
-          <div style="margin-top:8px;font-size:11px">PWA: tap Share → Add to Home Screen</div>
+          <div style="margin-bottom:4px">On iPhone: tap <strong style="color:var(--text)">Share → Add to Home Screen</strong></div>
+          <div>On Android: tap <strong style="color:var(--text)">⋮ → Install App</strong></div>
         </div>
       </div>
     </div>
@@ -362,43 +358,22 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">Log Activity</div>
-    <div class="tabs" id="act-type-tabs" style="margin-bottom:12px">
-      <button class="tab active" data-acttype="Cycling"    onclick="setActType('Cycling')">🚴</button>
-      <button class="tab"        data-acttype="Kettlebell" onclick="setActType('Kettlebell')">🏋️</button>
-      <button class="tab"        data-acttype="Football"   onclick="setActType('Football')">⚽</button>
-      <button class="tab"        data-acttype="Gym"        onclick="setActType('Gym')">💪</button>
-      <button class="tab"        data-acttype="Walking"    onclick="setActType('Walking')">🚶</button>
-      <button class="tab"        data-acttype="Custom"     onclick="setActType('Custom')">✏️</button>
+    <!-- Quick-pick suggestions -->
+    <div class="input-label" style="margin-bottom:6px">Quick pick</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Cycling')">🚴 Cycling</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Walking')">🚶 Walking</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Football')">⚽ Football</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Kettlebell')">🏋️ Kettlebell</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Gym')">💪 Gym</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Swimming')">🏊 Swimming</button>
+      <button class="tag" style="cursor:pointer;padding:6px 12px" onclick="actQuickPick('Yoga')">🧘 Yoga</button>
     </div>
+    <div class="input-group"><label class="input-label">Activity Name</label><input type="text" class="input" id="af-name" placeholder="e.g. Upper Body Gym, Cycling, Football…"/></div>
     <div class="input-group"><label class="input-label">Date</label><input type="date" class="input" id="af-date"/></div>
-    <!-- Custom name (Custom only) -->
-    <div id="af-custom-name-group" class="input-group hidden"><label class="input-label">Activity Name</label><input type="text" class="input" id="af-custom-name" placeholder="e.g. Tennis, Swimming…"/></div>
-    <!-- Gym workout name -->
-    <div id="af-gym-name-group" class="input-group hidden"><label class="input-label">Workout Name</label><input type="text" class="input" id="af-gym-name" placeholder="e.g. Upper body, Leg day…"/></div>
     <div class="input-group"><label class="input-label">Duration (min)</label><input type="number" class="input" id="af-duration" placeholder="e.g. 45"/></div>
-    <div class="input-group"><label class="input-label">Calories Burned (optional)</label><input type="number" class="input" id="af-calories" placeholder="e.g. 350"/></div>
-    <!-- Cycling fields -->
-    <div id="af-cycling-fields">
-      <div class="input-group"><label class="input-label">Distance (km)</label><input type="number" step="0.1" class="input" id="af-distance" placeholder="e.g. 25"/></div>
-      <div class="input-group"><label class="input-label">Avg Speed (km/h)</label><input type="number" step="0.1" class="input" id="af-speed" placeholder="e.g. 22"/></div>
-      <div class="input-group"><label class="input-label">Elevation Gain (m)</label><input type="number" class="input" id="af-elevation" placeholder="e.g. 180"/></div>
-    </div>
-    <!-- Kettlebell fields -->
-    <div id="af-kb-fields" class="hidden">
-      <div class="input-group"><label class="input-label">Kettlebell Weight (kg)</label><input type="number" class="input" id="af-kbweight" placeholder="e.g. 16"/></div>
-      <div class="input-group"><label class="input-label">Exercises</label><input type="text" class="input" id="af-exercises" placeholder="e.g. Swings, Cleans, Press"/></div>
-    </div>
-    <!-- Gym fields -->
-    <div id="af-gym-fields" class="hidden">
-      <div class="input-group"><label class="input-label">Muscle Groups</label><input type="text" class="input" id="af-muscles" placeholder="e.g. Chest, Back, Shoulders"/></div>
-    </div>
-    <!-- Walking fields -->
-    <div id="af-walk-fields" class="hidden">
-      <div class="input-group"><label class="input-label">Steps (optional)</label><input type="number" class="input" id="af-steps" placeholder="e.g. 8500"/></div>
-      <div class="input-group"><label class="input-label">Distance km (optional)</label><input type="number" step="0.1" class="input" id="af-walk-dist" placeholder="e.g. 5.2"/></div>
-    </div>
-    <!-- Custom distance -->
-    <div id="af-custom-dist-group" class="input-group hidden"><label class="input-label">Distance (optional)</label><input type="number" step="0.1" class="input" id="af-custom-dist" placeholder="e.g. 5.0"/></div>
+    <div class="input-group"><label class="input-label">Calories (optional)</label><input type="number" class="input" id="af-calories" placeholder="e.g. 350"/></div>
+    <div class="input-group"><label class="input-label">Distance km (optional)</label><input type="number" step="0.1" class="input" id="af-distance" placeholder="e.g. 25"/></div>
     <div class="input-group"><label class="input-label">Notes (optional)</label><input type="text" class="input" id="af-notes" placeholder="Any notes…"/></div>
     <button class="btn btn-primary" onclick="saveActivity()" style="margin-bottom:8px">Save Activity</button>
     <button class="btn btn-secondary" onclick="closeModal('modal-activity')">Cancel</button>
@@ -409,17 +384,21 @@
 <div class="modal-backdrop hidden" id="modal-meal-entry">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Add Meal Entry</div>
+    <div class="modal-title">Log Meal</div>
     <div class="input-group">
       <label class="input-label">Meal</label>
-      <select class="input" id="me-meal-type">
+      <select class="input" id="me-meal-type" onchange="updateMealSuggestions()">
         <option>Breakfast</option><option>Lunch</option><option>Snack</option><option>Dinner</option><option>Late Night</option>
       </select>
     </div>
-    <div class="input-group"><label class="input-label">Description</label><input type="text" class="input" id="me-desc" placeholder="e.g. Egg curry + 2 rotis"/></div>
-    <div class="input-group"><label class="input-label">Protein g (optional)</label><input type="number" class="input" id="me-protein" placeholder="e.g. 25"/></div>
-    <div class="input-group"><label class="input-label">Calories (optional)</label><input type="number" class="input" id="me-cals" placeholder="e.g. 350"/></div>
-    <div class="input-group"><label class="input-label">Notes (optional)</label><input type="text" class="input" id="me-notes" placeholder=""/></div>
+    <!-- Quick-pick meal templates -->
+    <div class="input-label" style="margin-bottom:6px">Quick pick (tap to fill)</div>
+    <div id="me-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div class="input-group"><label class="input-label">What did you eat?</label><input type="text" class="input" id="me-desc" placeholder="e.g. Egg curry + 2 rotis, Chicken + rice…"/></div>
+    <div style="display:flex;gap:10px">
+      <div class="input-group" style="flex:1"><label class="input-label">Protein g (optional)</label><input type="number" class="input" id="me-protein" placeholder="e.g. 25"/></div>
+      <div class="input-group" style="flex:1"><label class="input-label">Calories (optional)</label><input type="number" class="input" id="me-cals" placeholder="e.g. 350"/></div>
+    </div>
     <button class="btn btn-primary" onclick="saveMealEntry()" style="margin-bottom:8px">Save</button>
     <button class="btn btn-secondary" onclick="closeModal('modal-meal-entry')">Cancel</button>
   </div>
@@ -460,6 +439,57 @@
   </div>
 </div>
 
+<!-- Create / Edit Profile Modal -->
+<div class="modal-backdrop hidden" id="modal-create-profile">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="cp-modal-title">Create Profile</div>
+    <input type="hidden" id="cp-edit-id"/>
+    <div class="input-group"><label class="input-label">Name</label><input type="text" class="input" id="cp-name" placeholder="e.g. Alex, Sarah…"/></div>
+    <div class="input-group">
+      <label class="input-label">Primary Goal</label>
+      <select class="input" id="cp-goal-type">
+        <option value="lose_weight">Lose Weight</option>
+        <option value="gain_muscle">Gain Muscle</option>
+        <option value="improve_fitness">Improve Fitness</option>
+        <option value="improve_energy">Improve Energy</option>
+        <option value="general_health">General Health</option>
+        <option value="build_consistency">Build Consistency</option>
+      </select>
+    </div>
+    <div class="input-group"><label class="input-label">Target Weight (kg)</label><input type="number" step="0.1" class="input" id="cp-goal-weight" placeholder="e.g. 80"/></div>
+    <div class="input-group"><label class="input-label">Current Weight (kg)</label><input type="number" step="0.1" class="input" id="cp-start-weight" placeholder="e.g. 95"/></div>
+    <div class="input-group"><label class="input-label">Goal Date</label><input type="date" class="input" id="cp-goal-date"/></div>
+    <div class="input-group">
+      <label class="input-label">Profile Color</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="cp-color-picker">
+        <button class="color-swatch active" data-color="#7c6bff" style="background:#7c6bff" onclick="selectColor('#7c6bff',this)"></button>
+        <button class="color-swatch" data-color="#ff6bbd" style="background:#ff6bbd" onclick="selectColor('#ff6bbd',this)"></button>
+        <button class="color-swatch" data-color="#6bffb8" style="background:#6bffb8" onclick="selectColor('#6bffb8',this)"></button>
+        <button class="color-swatch" data-color="#f5a623" style="background:#f5a623" onclick="selectColor('#f5a623',this)"></button>
+        <button class="color-swatch" data-color="#ff6b6b" style="background:#ff6b6b" onclick="selectColor('#ff6b6b',this)"></button>
+        <button class="color-swatch" data-color="#4caf82" style="background:#4caf82" onclick="selectColor('#4caf82',this)"></button>
+        <button class="color-swatch" data-color="#00bcd4" style="background:#00bcd4" onclick="selectColor('#00bcd4',this)"></button>
+        <button class="color-swatch" data-color="#e91e63" style="background:#e91e63" onclick="selectColor('#e91e63',this)"></button>
+      </div>
+    </div>
+    <!-- Habit recommendations -->
+    <div id="cp-habit-recs" style="display:none">
+      <div class="section-label">Recommended Habits</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tap to toggle — selected habits will be added to your profile.</div>
+      <div id="cp-habit-recs-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()" style="margin-bottom:8px" id="cp-save-btn">Create Profile</button>
+    <button class="btn btn-secondary" onclick="closeModal('modal-create-profile')" style="margin-bottom:8px">Cancel</button>
+    <button class="btn btn-danger hidden" id="cp-delete-btn" onclick="deleteCurrentProfile()">Delete Profile</button>
+  </div>
+</div>
+
+<style>
+.color-swatch{width:28px;height:28px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:border-color .2s;flex-shrink:0}
+.color-swatch.active{border-color:#fff}
+</style>
+
 <!-- CSS -->
 <style>
 :root{
@@ -471,20 +501,21 @@
   --safe-bot:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;overflow:hidden}
-body{padding-top:var(--safe-top)}
+html{height:100%;height:100dvh;background:var(--bg)}
+body{height:100%;height:100dvh;background:var(--bg);color:var(--text);font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;overflow:hidden;padding-top:var(--safe-top);-webkit-text-size-adjust:100%}
 input,select,textarea,button{font-family:inherit;color:var(--text)}
 input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none}
 ::-webkit-scrollbar{display:none}
 select{-webkit-appearance:none;appearance:none}
 
-#app{display:flex;flex-direction:column;height:100vh;max-width:430px;margin:0 auto}
-#pages-wrap{flex:1;overflow-y:auto;overflow-x:hidden;position:relative}
-.page{padding:16px 16px 8px;min-height:100%}
+/* App shell — 100dvh accounts for Safari's collapsible toolbar */
+#app{display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;position:relative}
+#pages-wrap{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none}
+.page{padding:14px 16px 20px;min-height:100%}
 .page.hidden{display:none}
 
-/* Nav */
-nav{display:flex;background:rgba(10,10,15,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:8px 0 calc(8px + var(--safe-bot));justify-content:space-around;flex-shrink:0;z-index:100}
+/* Nav — always above home indicator; explicit safe-area padding */
+nav{display:flex;background:rgba(10,10,15,0.97);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);padding:8px 4px;padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px));justify-content:space-around;flex-shrink:0;z-index:100;position:relative}
 .nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;border:none;background:none;cursor:pointer;min-width:46px}
 .nav-icon{font-size:20px;line-height:1}
 .nav-label{font-size:8px;font-weight:600;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
@@ -572,7 +603,7 @@ nav{display:flex;background:rgba(10,10,15,0.96);backdrop-filter:blur(20px);borde
 /* Modal */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:flex-end}
 .modal-backdrop.hidden{display:none}
-.modal{background:var(--surface);border-radius:24px 24px 0 0;padding:20px 16px calc(20px + var(--safe-bot));width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--border)}
+.modal{background:var(--surface);border-radius:24px 24px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));width:100%;max-height:90dvh;overflow-y:auto;border:1px solid var(--border)}
 .modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
 .modal-title{font-size:18px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em}
 
@@ -609,8 +640,11 @@ nav{display:flex;background:rgba(10,10,15,0.96);backdrop-filter:blur(20px);borde
 <script>
 'use strict';
 // ══════════════════════════════════════════════════════════
-//  PROJECT 80 v2 — Main Application Script
+//  MOMENTUM — Personal Fitness & Wellness Dashboard
 // ══════════════════════════════════════════════════════════
+
+// ── App identity (single source of truth) ─────────────────
+const APP_NAME = 'Momentum';
 
 // ── CDN guard ─────────────────────────────────────────────
 window.addEventListener('error', e => {
@@ -623,14 +657,13 @@ window.addEventListener('error', e => {
 const SUPABASE_URL  = 'https://yccauildfqxqwqsqwujv.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_irUWOc1_tXz9Dz94J7-6JQ_eT_IPdsv';
 
-// ── Profile config ────────────────────────────────────────
-const PROFILES = {
-  kaveesh: { id:'kaveesh', name:'Kaveesh', goalWeight:80,  startWeight:99.9, goalDate:'2027-01-01' },
-  mitali:  { id:'mitali',  name:'Mitali',  goalWeight:70,  startWeight:null, goalDate:'2027-01-01' },
-};
+// ── Profiles: loaded dynamically from Supabase/localStorage ──
+// Not hardcoded. Keyed by profile id (slug).
+// Schema per profile: { id, name, goalWeight, startWeight, goalDate, color, goalType }
+let PROFILES = {};   // populated at boot
 
 // ── App state ─────────────────────────────────────────────
-let currentProfile = 'kaveesh';
+let currentProfile = null;  // set after profiles load
 let currentPage    = 'dashboard';
 let currentActType = 'Cycling';
 let currentActTab  = 'act-log';
@@ -640,12 +673,11 @@ let syncTimer      = null;
 let offlineQueue   = [];
 let isOnline       = navigator.onLine;
 let sb             = null;  // Supabase client
+let selectedProfileColor = '#7c6bff';  // for create-profile modal
+let selectedHabitRecs    = new Set();  // habit recs chosen in create modal
 
-// Per-profile data (keyed by profile id)
-const DB = {
-  kaveesh: { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{} },
-  mitali:  { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{} },
-};
+// Per-profile data — keyed by profile id, created dynamically
+const DB = {};  // { [pid]: { weights, activities, nutrition, habits, habitDefs, settings } }
 
 // ── Charts map ────────────────────────────────────────────
 const charts = {};
@@ -659,6 +691,23 @@ async function boot() {
 
     // Init Supabase
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    // Load profiles first (needed before anything else)
+    await loadProfiles();
+
+    // If no profiles exist at all, show create-profile screen immediately
+    if (Object.keys(PROFILES).length === 0) {
+      document.getElementById('boot-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      openModal('modal-create-profile');
+      document.getElementById('cp-modal-title').textContent = 'Welcome to ' + APP_NAME + '! Create Your Profile';
+      renderProfileSwitcher();
+      return;
+    }
+
+    // Set current profile to first profile (or last used)
+    const lastUsed = localStorage.getItem('momentum_last_profile');
+    currentProfile = (lastUsed && PROFILES[lastUsed]) ? lastUsed : Object.keys(PROFILES)[0];
 
     // Load localStorage cache immediately (fast)
     loadLocalCache();
@@ -680,9 +729,8 @@ async function boot() {
     // Init activity tabs
     setupTabGroup('act-tabs', 'atab', id => {
       currentActTab = id;
-      ['act-log','act-cycling','act-stats'].forEach(x => document.getElementById(x).classList.toggle('hidden', x!==id));
-      if (id==='act-cycling') renderCycling();
-      if (id==='act-stats')   renderActivityStats();
+      ['act-log','act-stats'].forEach(x => document.getElementById(x).classList.toggle('hidden', x!==id));
+      if (id==='act-stats') renderActivityStats();
     });
 
     // Init more tabs
@@ -694,7 +742,7 @@ async function boot() {
       if (id==='more-data')      renderDataSummary();
     });
 
-    // Migrate old single-profile localStorage data to Kaveesh
+    // Migrate old single-profile localStorage data to first profile
     migrateOldData();
 
     // Load from Supabase
@@ -702,7 +750,9 @@ async function boot() {
     await loadAllFromSupabase();
     setSyncStatus('ok');
 
-    // Render initial page
+    // Render profile switcher and initial page
+    renderProfileSwitcher();
+    applyProfileAccent();
     renderPage(currentPage);
 
     // Realtime subscription for cross-browser sync
@@ -730,31 +780,99 @@ function lsSave(profile, table, val) {
   try { localStorage.setItem(lsKey(profile,table), JSON.stringify(val)); } catch {}
 }
 
+function ensureProfileDB(pid) {
+  if (!DB[pid]) {
+    DB[pid] = { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{} };
+  }
+}
+
 function loadLocalCache() {
-  for (const pid of ['kaveesh','mitali']) {
-    DB[pid].weights    = lsLoad(pid,'weights', []);
+  // Load all known profiles (from PROFILES + anything cached)
+  const allPids = new Set([
+    ...Object.keys(PROFILES),
+    ...Object.keys(DB),
+  ]);
+  for (const pid of allPids) {
+    ensureProfileDB(pid);
+    DB[pid].weights    = lsLoad(pid,'weights',   []);
     DB[pid].activities = lsLoad(pid,'activities', []);
-    DB[pid].nutrition  = lsLoad(pid,'nutrition', []);
-    DB[pid].habits     = lsLoad(pid,'habits', {});
-    DB[pid].habitDefs  = lsLoad(pid,'habitDefs', defaultHabitDefs(pid));
-    DB[pid].settings   = lsLoad(pid,'settings', defaultSettings(pid));
+    DB[pid].nutrition  = lsLoad(pid,'nutrition',  []);
+    DB[pid].habits     = lsLoad(pid,'habits',     {});
+    DB[pid].habitDefs  = lsLoad(pid,'habitDefs',  defaultHabitDefs(pid));
+    DB[pid].settings   = lsLoad(pid,'settings',   defaultSettings(pid));
   }
 }
 
 function saveLocalCache(profile) {
   const d = DB[profile];
-  lsSave(profile,'weights', d.weights);
-  lsSave(profile,'activities', d.activities);
+  if (!d) return;
+  lsSave(profile,'weights',   d.weights);
+  lsSave(profile,'activities',d.activities);
   lsSave(profile,'nutrition', d.nutrition);
-  lsSave(profile,'habits', d.habits);
+  lsSave(profile,'habits',    d.habits);
   lsSave(profile,'habitDefs', d.habitDefs);
-  lsSave(profile,'settings', d.settings);
+  lsSave(profile,'settings',  d.settings);
 }
 
 // ══ SUPABASE SYNC ════════════════════════════════════════
+
+// ── Load profiles from Supabase (and localStorage fallback) ──
+async function loadProfiles() {
+  // First try localStorage for instant display
+  const cached = lsLoad('_app','profiles', null);
+  if (cached && Array.isArray(cached) && cached.length > 0) {
+    PROFILES = {};
+    cached.forEach(p => { PROFILES[p.id] = p; ensureProfileDB(p.id); });
+  }
+
+  // Then try Supabase
+  if (sb && isOnline) {
+    try {
+      const { data, error } = await sb.from('profiles').select('*').order('created_at');
+      if (!error && data && data.length > 0) {
+        PROFILES = {};
+        data.forEach(p => {
+          PROFILES[p.id] = {
+            id:          p.id,
+            name:        p.name,
+            goalWeight:  p.goal_weight,
+            startWeight: p.start_weight,
+            goalDate:    p.goal_date,
+            color:       p.color || '#7c6bff',
+            goalType:    p.goal_type || 'lose_weight',
+          };
+          ensureProfileDB(p.id);
+        });
+        lsSave('_app','profiles', Object.values(PROFILES));
+        return;
+      }
+    } catch(e) { console.warn('Could not load profiles from Supabase:', e); }
+  }
+
+  // Fallback: seed the two known legacy profiles if absolutely nothing exists
+  if (Object.keys(PROFILES).length === 0) {
+    const legacy = [
+      { id:'kaveesh', name:'Kaveesh', goalWeight:80,  startWeight:99.9, goalDate:'2027-01-01', color:'#7c6bff', goalType:'lose_weight' },
+      { id:'mitali',  name:'Mitali',  goalWeight:70,  startWeight:null, goalDate:'2027-01-01', color:'#ff6bbd', goalType:'lose_weight' },
+    ];
+    legacy.forEach(p => { PROFILES[p.id] = p; ensureProfileDB(p.id); });
+    lsSave('_app','profiles', legacy);
+    // Push legacy profiles to Supabase
+    if (sb && isOnline) {
+      for (const p of legacy) {
+        await sb.from('profiles').upsert({
+          id: p.id, name: p.name, goal_weight: p.goalWeight,
+          start_weight: p.startWeight, goal_date: p.goalDate,
+          color: p.color, goal_type: p.goalType,
+        }, { onConflict: 'id' }).catch(()=>{});
+      }
+    }
+  }
+}
+
 async function loadAllFromSupabase() {
   if (!isOnline) return;
-  for (const pid of ['kaveesh','mitali']) {
+  for (const pid of Object.keys(PROFILES)) {
     await loadProfileFromSupabase(pid);
   }
 }
@@ -801,6 +919,52 @@ async function refreshFromSupabase() {
   renderPage(currentPage);
 }
 
+// ── Numeric coercion: '' / undefined / NaN → null ─────────
+function toNumberOrNull(v) {
+  if (v === '' || v === undefined || v === null) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+// ── Column-name translation before any Supabase write ─────
+// The JS objects use camelCase internally; the DB uses snake_case.
+// This function produces a clean row object for each table.
+function toDbRow(table, payload, profile) {
+  const base = { ...payload, profile_id: profile };
+  if (table === 'weights') {
+    return {
+      id:         base.id,
+      profile_id: profile,
+      date:       base.date,
+      weight:     toNumberOrNull(base.weight),
+      body_fat:   toNumberOrNull(base.bodyFat ?? base.body_fat),
+      waist:      toNumberOrNull(base.waist),
+    };
+  }
+  if (table === 'activities') {
+    return {
+      id:         base.id,
+      profile_id: profile,
+      date:       base.date,
+      type:       base.type       || null,
+      name:       base.name       || null,
+      duration:   toNumberOrNull(base.duration),
+      calories:   toNumberOrNull(base.calories),
+      distance:   toNumberOrNull(base.distance),
+      speed:      toNumberOrNull(base.speed),
+      elevation:  toNumberOrNull(base.elevation),
+      kbweight:   base.kbweight   || null,
+      exercises:  base.exercises  || null,
+      muscles:    base.muscles    || null,
+      steps:      toNumberOrNull(base.steps),
+      notes:      base.notes      || null,
+    };
+  }
+  // All other tables (nutrition, habits, habit_definitions, settings)
+  // use matching column names already — pass through with profile_id set.
+  return base;
+}
+
 async function pushToSupabase(table, payload, profile) {
   if (!sb) return;
   if (!isOnline) {
@@ -809,12 +973,18 @@ async function pushToSupabase(table, payload, profile) {
     return;
   }
   setSyncStatus('saving');
+  const row = toDbRow(table, payload, profile);
+  console.log('[Supabase] upsert', table, row);
   try {
-    const { error } = await sb.from(table).upsert({...payload, profile_id: profile});
-    if (error) { console.error('Supabase push error:', error); setSyncStatus('error'); }
-    else { setSyncStatus('ok'); }
+    const { error } = await sb.from(table).upsert(row);
+    if (error) {
+      console.error('[Supabase] push error on', table, ':', error.message, row);
+      setSyncStatus('error');
+    } else {
+      setSyncStatus('ok');
+    }
   } catch(e) {
-    console.error('Supabase push exception:', e);
+    console.error('[Supabase] push exception on', table, ':', e);
     setSyncStatus('error');
     offlineQueue.push({table, payload, profile});
   }
@@ -845,7 +1015,7 @@ async function flushOfflineQueue() {
 function setupRealtimeSync() {
   if (!sb) return;
   try {
-    sb.channel('project80-changes')
+    sb.channel('momentum-changes')
       .on('postgres_changes', { event:'*', schema:'public' }, () => {
         // Another browser made a change — refresh after short debounce
         if (syncTimer) clearTimeout(syncTimer);
@@ -863,42 +1033,47 @@ function setSyncStatus(state) {
   el.title = {idle:'Idle',ok:'Synced with cloud',saving:'Saving…',offline:'Offline — changes queued',error:'Sync failed — data retained locally'}[state]||'';
 }
 
-// ══ MIGRATION (old single-profile data → Kaveesh) ════════
+// ══ MIGRATION (old single-profile data → first profile) ══
 function migrateOldData() {
   if (localStorage.getItem('p80v2_migrated')) return;
-  // Old keys from v1
+  // Migrate to whichever profile ID matches 'kaveesh' if it exists, else first profile
+  const targetPid = PROFILES['kaveesh'] ? 'kaveesh' : Object.keys(PROFILES)[0];
+  if (!targetPid) return;
+
+  ensureProfileDB(targetPid);
   const oldW = localStorage.getItem('p80_weights');
   const oldA = localStorage.getItem('p80_activities');
   const oldN = localStorage.getItem('p80_nutrition');
   const oldH = localStorage.getItem('p80_habits');
   if (oldW) {
     try {
-      const existing = DB['kaveesh'].weights;
+      const existing = DB[targetPid].weights;
       const legacy   = JSON.parse(oldW);
-      // Merge by date — don't overwrite real entries
-      const dateSet = new Set(existing.map(w=>w.date));
+      const dateSet  = new Set(existing.map(w=>w.date));
       for (const w of legacy) {
         if (!dateSet.has(w.date)) {
-          existing.push({...w, profile_id:'kaveesh'});
+          existing.push({...w, profile_id: targetPid});
           dateSet.add(w.date);
         }
       }
-      DB['kaveesh'].weights = existing;
-      lsSave('kaveesh','weights', DB['kaveesh'].weights);
+      DB[targetPid].weights = existing;
+      lsSave(targetPid,'weights', DB[targetPid].weights);
     } catch(e) { console.warn('Migration error:', e); }
   }
-  if (oldA) { try { DB['kaveesh'].activities = [...DB['kaveesh'].activities, ...JSON.parse(oldA)]; lsSave('kaveesh','activities', DB['kaveesh'].activities); } catch {} }
-  if (oldN) { try { DB['kaveesh'].nutrition  = [...DB['kaveesh'].nutrition,  ...JSON.parse(oldN)]; lsSave('kaveesh','nutrition',  DB['kaveesh'].nutrition); } catch {} }
-  if (oldH) { try { DB['kaveesh'].habits = { ...JSON.parse(oldH), ...DB['kaveesh'].habits }; lsSave('kaveesh','habits', DB['kaveesh'].habits); } catch {} }
+  if (oldA) { try { DB[targetPid].activities = [...DB[targetPid].activities, ...JSON.parse(oldA)]; lsSave(targetPid,'activities', DB[targetPid].activities); } catch {} }
+  if (oldN) { try { DB[targetPid].nutrition  = [...DB[targetPid].nutrition,  ...JSON.parse(oldN)]; lsSave(targetPid,'nutrition',  DB[targetPid].nutrition); } catch {} }
+  if (oldH) { try { DB[targetPid].habits = { ...JSON.parse(oldH), ...DB[targetPid].habits }; lsSave(targetPid,'habits', DB[targetPid].habits); } catch {} }
 
-  // Seed known Kaveesh weights if no data exists
-  seedKaveeshWeights();
+  // Seed known Kaveesh weights into kaveesh profile if empty
+  if (targetPid === 'kaveesh') seedKaveeshWeights();
 
   localStorage.setItem('p80v2_migrated', '1');
 }
 
 function seedKaveeshWeights() {
-  const existing = DB['kaveesh'].weights;
+  const pid = 'kaveesh';
+  if (!DB[pid]) ensureProfileDB(pid);
+  const existing = DB[pid].weights;
   if (existing.length > 0) return;  // don't overwrite
   const known = [
     { date:'2026-08-10', weight:99.9 },
@@ -912,14 +1087,11 @@ function seedKaveeshWeights() {
     { date:'2026-08-18', weight:96.2 },
   ];
   known.forEach((w,i) => {
-    existing.push({ id: 'seed-'+i, date: w.date, weight: w.weight, bodyFat: null, waist: null, profile_id:'kaveesh' });
+    existing.push({ id:'seed-'+i, date:w.date, weight:w.weight, bodyFat:null, waist:null, profile_id:pid });
   });
-  DB['kaveesh'].weights = existing;
-  lsSave('kaveesh','weights', existing);
-  // Push to Supabase
-  for (const w of existing) {
-    pushToSupabase('weights', w, 'kaveesh');
-  }
+  DB[pid].weights = existing;
+  lsSave(pid,'weights', existing);
+  for (const w of existing) pushToSupabase('weights', w, pid);
 }
 
 // ══ DEFAULTS ═════════════════════════════════════════════
@@ -945,16 +1117,244 @@ function defaultHabitDefs(pid) {
   ];
 }
 
-// ══ PROFILE SWITCHING ════════════════════════════════════
+// ══ PROFILE MANAGEMENT ═══════════════════════════════════
+
+function P()    { return DB[currentProfile] || (DB[currentProfile] = {weights:[],activities:[],nutrition:[],habits:{},habitDefs:[],settings:{}}); }
+function PROF() { return PROFILES[currentProfile] || {}; }
+
+function renderProfileSwitcher() {
+  const container = document.getElementById('profile-switcher-btns');
+  if (!container) return;
+  container.innerHTML = Object.values(PROFILES).map(p => `
+    <button
+      id="profile-btn-${p.id}"
+      class="profile-btn${currentProfile===p.id?' active':''}"
+      onclick="switchProfile('${p.id}')"
+      style="${currentProfile===p.id?'background:'+p.color+';border-color:'+p.color+';color:#fff':''}">
+      ${p.name}
+    </button>`).join('');
+}
+
+function applyProfileAccent() {
+  const col = PROF().color || '#7c6bff';
+  document.documentElement.style.setProperty('--accent', col);
+}
+
 function switchProfile(pid) {
+  if (!PROFILES[pid]) return;
   currentProfile = pid;
   habitViewDate  = todayStr();
-  document.querySelectorAll('.profile-btn').forEach(b => b.classList.toggle('active', b.id === 'profile-btn-'+pid));
+  localStorage.setItem('momentum_last_profile', pid);
+  renderProfileSwitcher();
+  applyProfileAccent();
   refreshFromSupabase().then(() => renderPage(currentPage));
 }
 
-function P() { return DB[currentProfile]; }
-function PROF() { return PROFILES[currentProfile]; }
+// ── Color swatch for create-profile modal ─────────────────
+function selectColor(color, el) {
+  selectedProfileColor = color;
+  document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── Habit recommendations by goal type ────────────────────
+const HABIT_RECOMMENDATIONS = {
+  lose_weight: [
+    { name:'Daily Weigh-In',      category:'Morning' },
+    { name:'Drink Water',         category:'Morning' },
+    { name:'Protein With Meals',  category:'Meals'   },
+    { name:'Walk Daily',          category:'Workout' },
+    { name:'Avoid Late Snacking', category:'Night'   },
+    { name:'Track Meals',         category:'Meals'   },
+    { name:'Cinnamon Water',      category:'Night'   },
+  ],
+  gain_muscle: [
+    { name:'Daily Weigh-In',     category:'Morning' },
+    { name:'Workout',            category:'Workout' },
+    { name:'Protein With Meals', category:'Meals'   },
+    { name:'Post-Workout Shake', category:'Workout' },
+    { name:'Sleep 8 Hours',      category:'Night'   },
+    { name:'Stretch',            category:'Workout' },
+  ],
+  improve_fitness: [
+    { name:'Daily Workout',    category:'Workout' },
+    { name:'Drink Water',      category:'Morning' },
+    { name:'Stretch',          category:'Workout' },
+    { name:'Sleep Goal',       category:'Night'   },
+    { name:'Step Goal',        category:'Workout' },
+    { name:'Daily Weigh-In',   category:'Morning' },
+  ],
+  improve_energy: [
+    { name:'Sleep Before 11 PM', category:'Night'   },
+    { name:'Morning Walk',       category:'Morning' },
+    { name:'Drink Water',        category:'Morning' },
+    { name:'No Phone Before Bed',category:'Night'   },
+    { name:'Eat Breakfast',      category:'Meals'   },
+    { name:'Vitamins',           category:'Morning' },
+  ],
+  general_health: [
+    { name:'Daily Weigh-In',  category:'Morning' },
+    { name:'Drink Water',     category:'Morning' },
+    { name:'Eat Fruit',       category:'Meals'   },
+    { name:'Walk Daily',      category:'Workout' },
+    { name:'Sleep Goal',      category:'Night'   },
+    { name:'Read',            category:'Night'   },
+    { name:'Vitamins',        category:'Morning' },
+  ],
+  build_consistency: [
+    { name:'Daily Check-In',  category:'Morning' },
+    { name:'Drink Water',     category:'Morning' },
+    { name:'Workout',         category:'Workout' },
+    { name:'Journaling',      category:'Night'   },
+    { name:'Sleep Goal',      category:'Night'   },
+    { name:'Meal Prep',       category:'Meals'   },
+  ],
+};
+
+function openCreateProfileModal(editId) {
+  selectedHabitRecs.clear();
+  selectedProfileColor = '#7c6bff';
+  document.querySelectorAll('.color-swatch').forEach(b=>{b.classList.remove('active');if(b.dataset.color==='#7c6bff')b.classList.add('active');});
+
+  if (editId) {
+    const p = PROFILES[editId];
+    document.getElementById('cp-modal-title').textContent = 'Edit Profile';
+    document.getElementById('cp-edit-id').value = editId;
+    document.getElementById('cp-name').value = p.name;
+    document.getElementById('cp-goal-type').value = p.goalType||'lose_weight';
+    document.getElementById('cp-goal-weight').value = p.goalWeight||'';
+    document.getElementById('cp-start-weight').value = p.startWeight||'';
+    document.getElementById('cp-goal-date').value = p.goalDate||'';
+    selectedProfileColor = p.color||'#7c6bff';
+    document.querySelectorAll('.color-swatch').forEach(b=>{b.classList.toggle('active',b.dataset.color===selectedProfileColor);});
+    document.getElementById('cp-save-btn').textContent = 'Save Changes';
+    document.getElementById('cp-delete-btn').classList.remove('hidden');
+    document.getElementById('cp-habit-recs').style.display='none';
+  } else {
+    document.getElementById('cp-modal-title').textContent = 'Create Profile';
+    document.getElementById('cp-edit-id').value = '';
+    ['cp-name','cp-goal-weight','cp-start-weight'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cp-goal-type').value = 'lose_weight';
+    document.getElementById('cp-goal-date').value = '';
+    document.getElementById('cp-save-btn').textContent = 'Create Profile';
+    document.getElementById('cp-delete-btn').classList.add('hidden');
+    updateHabitRecs();
+  }
+  openModal('modal-create-profile');
+}
+
+function updateHabitRecs() {
+  const goalType = document.getElementById('cp-goal-type').value;
+  const recs = HABIT_RECOMMENDATIONS[goalType] || [];
+  const listEl = document.getElementById('cp-habit-recs-list');
+  document.getElementById('cp-habit-recs').style.display = recs.length ? '' : 'none';
+  selectedHabitRecs.clear();
+  recs.forEach(h => selectedHabitRecs.add(h.name)); // all selected by default
+  listEl.innerHTML = recs.map(h => `
+    <button class="tag habit-rec-chip selected" data-name="${h.name}" style="cursor:pointer;padding:6px 12px;border-color:var(--accent);color:var(--accent)" onclick="toggleHabitRec(this,'${h.name.replace(/'/g,"\\'")}')">
+      ${h.name}
+    </button>`).join('');
+}
+
+function toggleHabitRec(el, name) {
+  if (selectedHabitRecs.has(name)) {
+    selectedHabitRecs.delete(name);
+    el.style.borderColor='var(--border)'; el.style.color='var(--muted)';
+    el.classList.remove('selected');
+  } else {
+    selectedHabitRecs.add(name);
+    el.style.borderColor='var(--accent)'; el.style.color='var(--accent)';
+    el.classList.add('selected');
+  }
+}
+
+async function saveProfile() {
+  const editId   = document.getElementById('cp-edit-id').value;
+  const name     = document.getElementById('cp-name').value.trim();
+  const goalW    = toNumberOrNull(document.getElementById('cp-goal-weight').value);
+  const startW   = toNumberOrNull(document.getElementById('cp-start-weight').value);
+  const goalDate = document.getElementById('cp-goal-date').value;
+  const goalType = document.getElementById('cp-goal-type').value;
+  if (!name) { showToast('Enter a name'); return; }
+
+  // Generate a slug id from name
+  const pid = editId || (name.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')+'-'+Date.now().toString(36));
+
+  const profile = {
+    id: pid, name, goalWeight: goalW, startWeight: startW,
+    goalDate: goalDate||'2027-01-01', color: selectedProfileColor, goalType,
+  };
+
+  PROFILES[pid] = profile;
+  ensureProfileDB(pid);
+  lsSave('_app','profiles', Object.values(PROFILES));
+
+  // Push to Supabase profiles table
+  if (sb && isOnline) {
+    await sb.from('profiles').upsert({
+      id: pid, name, goal_weight: goalW, start_weight: startW,
+      goal_date: goalDate||'2027-01-01', color: selectedProfileColor, goal_type: goalType,
+    }, { onConflict: 'id' }).catch(e => console.warn('Profile save error:', e));
+  }
+
+  // If creating new: add recommended habits
+  if (!editId && selectedHabitRecs.size > 0) {
+    const goalType2 = goalType;
+    const recs = HABIT_RECOMMENDATIONS[goalType2] || [];
+    const selectedRecs = recs.filter(h => selectedHabitRecs.has(h.name));
+    DB[pid].habitDefs = selectedRecs.map((h, i) => ({
+      id:         'hd-'+pid+'-'+i,
+      name:       h.name,
+      category:   h.category,
+      time:       '',
+      enabled:    true,
+      sort_order: i+1,
+      profile_id: pid,
+    }));
+    saveLocalCache(pid);
+    for (const hd of DB[pid].habitDefs) {
+      await pushToSupabase('habit_definitions', hd, pid);
+    }
+  }
+
+  closeModal('modal-create-profile');
+  showToast(editId ? '✅ Profile updated' : '✅ Profile created');
+
+  // Switch to new profile
+  currentProfile = pid;
+  localStorage.setItem('momentum_last_profile', pid);
+  renderProfileSwitcher();
+  applyProfileAccent();
+  renderPage(currentPage);
+}
+
+async function deleteCurrentProfile() {
+  const editId = document.getElementById('cp-edit-id').value;
+  if (!editId || !PROFILES[editId]) return;
+  if (Object.keys(PROFILES).length <= 1) { showToast('Cannot delete the only profile'); return; }
+  if (!confirm('Delete profile "'+PROFILES[editId].name+'"? All data will be removed.')) return;
+
+  delete PROFILES[editId];
+  delete DB[editId];
+  lsSave('_app','profiles', Object.values(PROFILES));
+
+  if (sb && isOnline) {
+    await sb.from('profiles').delete().eq('id', editId).catch(()=>{});
+  }
+
+  currentProfile = Object.keys(PROFILES)[0];
+  localStorage.setItem('momentum_last_profile', currentProfile);
+  closeModal('modal-create-profile');
+  showToast('Profile deleted');
+  renderProfileSwitcher();
+  applyProfileAccent();
+  renderPage(currentPage);
+}
+
+// ── Goal type select change: refresh habit recs ───────────
+document.addEventListener('change', e => {
+  if (e.target.id === 'cp-goal-type') updateHabitRecs();
+});
 
 // ══ NAVIGATION ══════════════════════════════════════════
 function navigate(page) {
@@ -1033,101 +1433,126 @@ function showToast(msg) {
 }
 function openModal(id) {
   document.getElementById(id).classList.remove('hidden');
-  if (id==='modal-weight')   document.getElementById('wf-date').value = todayStr();
-  if (id==='modal-activity') document.getElementById('af-date').value = todayStr();
-  if (id==='modal-meal-entry') document.getElementById('af-date') && (document.getElementById('af-date').value = todayStr());
+  if (id==='modal-weight')     document.getElementById('wf-date').value = todayStr();
+  if (id==='modal-activity')   document.getElementById('af-date').value = todayStr();
+  if (id==='modal-meal-entry') updateMealSuggestions();
 }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ══ CONSERVATIVE PROJECTION ENGINE ════════════════════════
 // Rules:
-//  - Need ≥14 days data
-//  - Use smoothed 14-day or 21-day trend (linear regression on 7-day moving averages)
-//  - Cap max sustainable rate at 0.7 kg/week
-//  - Never project below goal weight
-//  - Never show completion earlier than today
+//  - Need ≥14 days of data to produce any projection.
+//  - Use the rolling 7-day average weight (not raw readings) to compute
+//    the weekly loss rate, which smooths out daily noise.
+//  - Also compute a 30-day average rate as a cross-check.
+//  - Use the SLOWER of the two rates (pessimistic) so projections don't
+//    chase short-term water-weight drops.
+//  - Hard cap at 0.7 kg/week sustainable loss.
+//  - NEVER project a weight below the user's goal weight.
+//  - NEVER produce a completion date earlier than today + 1 day.
+//  - Show a clear trend label: Excellent / On Track / Needs Improvement.
 function computeProjection(sw, prof) {
   const goalWeight = prof.goalWeight;
-  const daysLeft   = daysUntil(prof.goalDate);
+  const goalDate   = prof.goalDate;
+  const daysLeft   = daysUntil(goalDate);
+
   if (daysLeft <= 0) return { status:'expired', msg:'The goal date has passed.' };
 
   if (sw.length < 14) {
-    const daysNeeded = 14 - sw.length;
-    return { status:'insufficient', msg:`Keep logging for another ${daysNeeded} day${daysNeeded>1?'s':''} before we generate a reliable projection.` };
-  }
-
-  // 7-day moving averages over the last 21 days
-  const window = sw.slice(-21);
-  const mas = [];
-  for (let i = 6; i < window.length; i++) {
-    const slice = window.slice(i-6, i+1);
-    const avg = slice.reduce((s,w)=>s+w.weight,0)/slice.length;
-    const d   = slice[slice.length-1].date;
-    mas.push({ date:d, avg });
-  }
-
-  if (mas.length < 2) {
-    return { status:'insufficient', msg:'Not enough data for a reliable projection. Keep logging daily.' };
-  }
-
-  // Linear regression on the moving averages
-  const n  = mas.length;
-  const xs = mas.map((_,i)=>i);
-  const ys = mas.map(m=>m.avg);
-  const mx = xs.reduce((a,b)=>a+b,0)/n;
-  const my = ys.reduce((a,b)=>a+b,0)/n;
-  const num = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my),0);
-  const den = xs.reduce((s,x)=>s+(x-mx)**2,0);
-  if (den === 0) return { status:'insufficient', msg:'Not enough data variance for a projection.' };
-
-  const dayStep = dateDiffDays(mas[0].date, mas[n-1].date) / (n-1) || 1;
-  const slopePerDay = (num/den) / dayStep; // kg per day (negative = losing)
-  const weeklyTrend = +(slopePerDay * 7).toFixed(2); // negative = loss
-
-  // Cap at max sustainable loss of 0.7 kg/week
-  const MAX_RATE_PER_DAY = 0.7 / 7;
-  const effectiveRate = Math.min(-slopePerDay, MAX_RATE_PER_DAY); // positive = losing
-
-  const currentAvg = my + (num/den) * (n-1 - mx) / dayStep; // trend extrapolated to now
-  const lw = sortedWeights().slice(-1)[0]?.weight ?? PROF().startWeight;
-  const avg7  = sw.length>=7  ? +(sw.slice(-7).reduce((s,w)=>s+w.weight,0)/Math.min(sw.length,7)).toFixed(1)  : null;
-  const avg14 = sw.length>=14 ? +(sw.slice(-14).reduce((s,w)=>s+w.weight,0)/Math.min(sw.length,14)).toFixed(1) : null;
-
-  if (effectiveRate <= 0.001) {
+    const need = 14 - sw.length;
     return {
-      status:'watch',
-      weeklyTrend,
-      avg7, avg14,
-      msg:`Current trend: ~${weeklyTrend >= 0 ? '+' : ''}${weeklyTrend} kg/week. No consistent downward trend detected yet. Continue logging to build a clearer picture.`
+      status:'insufficient',
+      avg7: null, avg14: null,
+      msg:`Keep logging for another <strong>${need} day${need>1?'s':''}</strong> before we generate a reliable projection.`
     };
   }
 
-  // Project from current average weight
-  const daysToGoal = (lw - goalWeight) / effectiveRate;
-  const projectedAtGoalDate = Math.max(goalWeight, +(lw - effectiveRate * daysLeft).toFixed(1));
-  const completionDate = new Date();
-  completionDate.setDate(completionDate.getDate() + Math.round(daysToGoal));
-  const compDateStr = completionDate.toISOString().slice(0,10);
+  const lw = sw[sw.length-1].weight;
 
-  const trendLabel = effectiveRate < (0.7/7) && weeklyTrend > -0.3
-    ? 'slower than the capped rate (initial water-weight drop excluded)'
-    : '';
+  // Rolling averages (clamped to available data)
+  const w7  = sw.slice(-7);
+  const w14 = sw.slice(-14);
+  const w30 = sw.slice(-30);
+  const avg7  = +(w7.reduce((s,w)=>s+w.weight,0)/w7.length).toFixed(2);
+  const avg14 = +(w14.reduce((s,w)=>s+w.weight,0)/w14.length).toFixed(2);
+  const avg30 = w30.length >= 20 ? +(w30.reduce((s,w)=>s+w.weight,0)/w30.length).toFixed(2) : null;
 
-  const wasRateCapped = (-slopePerDay) > MAX_RATE_PER_DAY;
-  const effWeekly = +(effectiveRate * 7).toFixed(2);
-
-  let msg, status;
-  if (completionDate <= new Date(prof.goalDate)) {
-    msg = `Current trend: ~${effWeekly} kg/week${wasRateCapped?' (rate capped for realism)':''}\nAt this pace, you are on track to reach your goal around <strong>${fmtDate(compDateStr,'D MMM YYYY')}</strong>.`;
-    status = 'on-track';
-  } else {
-    msg = `Current trend: ~${effWeekly} kg/week${wasRateCapped?' (rate capped for realism)':''}\nAt this pace, you are projected to reach approximately <strong>${projectedAtGoalDate} kg</strong> by Jan 1, 2027.`;
-    const deficit = +(goalWeight - projectedAtGoalDate < 0 ? projectedAtGoalDate - goalWeight : 0).toFixed(1);
-    if (deficit > 0) msg += `\nTo reach the goal, aim for ~${+(effWeekly + deficit/(daysLeft/7)).toFixed(2)} kg/week.`;
-    status = projectedAtGoalDate <= goalWeight + 3 ? 'watch' : 'needs-attention';
+  // 7-day rate: compare rolling 7d avg now vs 7d avg from 7 days ago
+  let rate7 = 0;
+  if (sw.length >= 14) {
+    const prev7 = sw.slice(-14, -7);
+    const prevAvg = prev7.reduce((s,w)=>s+w.weight,0)/prev7.length;
+    rate7 = (prevAvg - avg7) / 7; // kg/day lost (positive = losing)
   }
 
-  return { status, weeklyTrend:effWeekly, avg7, avg14, projectedAtGoalDate, compDateStr, msg, wasRateCapped };
+  // 30-day rate: use endpoints of 30d window
+  let rate30 = 0;
+  if (sw.length >= 21) {
+    const oldest30 = sw.slice(-Math.min(sw.length,30))[0];
+    const span = dateDiffDays(oldest30.date, sw[sw.length-1].date) || 1;
+    rate30 = (oldest30.weight - lw) / span; // kg/day
+  }
+
+  // Use the slower (more conservative) of the two valid rates
+  const MAX_RATE = 0.7 / 7; // 0.1 kg/day hard cap
+  const candidates = [rate7, rate30].filter(r => r > 0.001);
+  if (!candidates.length) {
+    return {
+      status:'watch',
+      avg7: avg7.toFixed(1), avg14: avg14.toFixed(1),
+      msg:`<strong>Current trend:</strong> No consistent downward trend yet.<br>` +
+          `7-day average: ${avg7.toFixed(1)} kg. Keep logging daily.`
+    };
+  }
+  // Pessimistic: use the smallest positive rate
+  const rawRate  = Math.min(...candidates);
+  const effRate  = Math.min(rawRate, MAX_RATE); // kg/day
+  const effWeekly = +(effRate * 7).toFixed(2);
+  const capped   = rawRate > MAX_RATE;
+
+  // Days to reach goal from current weight
+  const daysToGoal = Math.round((lw - goalWeight) / effRate);
+
+  // Projected weight at goal date — HARD FLOOR at goalWeight
+  const rawProjected   = lw - effRate * daysLeft;
+  const projAtGoalDate = Math.max(goalWeight, +rawProjected.toFixed(1));
+
+  // Completion date — NEVER before tomorrow
+  const compDate = new Date();
+  compDate.setDate(compDate.getDate() + Math.max(1, daysToGoal));
+  const compDateStr = compDate.toISOString().slice(0,10);
+
+  // Trend quality label
+  const requiredRateForGoal = daysLeft > 0 ? (lw - goalWeight) / daysLeft : Infinity;
+  let trendLabel, status;
+  if (effRate >= requiredRateForGoal * 0.95) {
+    trendLabel = 'Excellent 🌟'; status = 'on-track';
+  } else if (effRate >= requiredRateForGoal * 0.70) {
+    trendLabel = 'On Track 👍'; status = 'on-track';
+  } else {
+    trendLabel = 'Needs Improvement 📈'; status = effRate > 0.01 ? 'watch' : 'needs-attention';
+  }
+
+  let msg;
+  if (compDate <= new Date(goalDate)) {
+    msg = `<strong>Trend:</strong> ${trendLabel}${capped?' (rate capped for realism)':''}<br>` +
+          `<strong>Weekly loss:</strong> ~${effWeekly} kg/week<br>` +
+          `<strong>Estimated goal date:</strong> ${fmtDate(compDateStr,'D MMM YYYY')} ✅`;
+  } else {
+    msg = `<strong>Trend:</strong> ${trendLabel}${capped?' (rate capped for realism)':''}<br>` +
+          `<strong>Weekly loss:</strong> ~${effWeekly} kg/week<br>` +
+          `<strong>Projected on ${fmtDate(goalDate,'D MMM YYYY')}:</strong> ~${projAtGoalDate} kg`;
+    if (projAtGoalDate > goalWeight) {
+      const shortfall = +(projAtGoalDate - goalWeight).toFixed(1);
+      msg += `<br><span style="color:var(--warning)">Gap: ${shortfall} kg — increase weekly loss by ~${+(shortfall/(daysLeft/7)).toFixed(2)} kg/wk to close it.</span>`;
+    }
+  }
+
+  return {
+    status, trendLabel, effWeekly, capped,
+    avg7: avg7.toFixed(1), avg14: avg14.toFixed(1),
+    projAtGoalDate, compDateStr, msg
+  };
 }
 
 // ══ DASHBOARD ══════════════════════════════════════════════
@@ -1174,6 +1599,45 @@ function renderDashboard() {
   const [label, cls] = statusMap[proj.status] || ['—','status-unknown'];
   badge.textContent = label;
   badge.className = 'status-badge ' + cls;
+
+  // ── Today's Wins card ─────────────────────────────────
+  const todayNutW = P().nutrition.find(n=>n.date===todayStr()) || {};
+  const waterTarget = P().settings.water_target || 3;
+  const winsItems = [];
+  if (sw.length && sw[sw.length-1].date === todayStr())
+    winsItems.push({ done:true,  label:'Weight Logged' });
+  else
+    winsItems.push({ done:false, label:'Weight Logged' });
+
+  if (P().activities.some(a=>a.date===todayStr()))
+    winsItems.push({ done:true,  label:'Workout Complete' });
+  else
+    winsItems.push({ done:false, label:'Workout Complete' });
+
+  if ((todayNutW.water||0) >= waterTarget)
+    winsItems.push({ done:true,  label:'Water Goal Hit' });
+  else
+    winsItems.push({ done:false, label:'Water Goal Hit' });
+
+  const winsNutEntries = Object.values(todayNutW.meals||{}).flat();
+  if (winsNutEntries.length > 0)
+    winsItems.push({ done:true,  label:'Meals Logged' });
+  else
+    winsItems.push({ done:false, label:'Meals Logged' });
+
+  const winsDone  = winsItems.filter(w=>w.done).length;
+  const winsTotal = winsItems.length;
+  const winsEl = document.getElementById('dash-wins-content');
+  winsEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="font-size:24px;font-weight:800;color:var(--accent)">${winsDone}<span style="font-size:14px;color:var(--muted);font-weight:600"> / ${winsTotal}</span></div>
+      <div style="flex:1"><div class="progress-wrap"><div class="progress-bar" style="width:${winsDone/winsTotal*100}%"></div></div></div>
+    </div>
+    ${winsItems.map(w=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
+        <span style="color:${w.done?'var(--accent3)':'var(--muted)'};font-size:16px">${w.done?'✓':'○'}</span>
+        <span style="color:${w.done?'var(--text)':'var(--muted)'}">${w.label}</span>
+      </div>`).join('')}`;
 
   // Projection card
   const projCard = document.getElementById('dash-proj-card');
@@ -1396,8 +1860,7 @@ function renderActivity() {
         </div>
       </div>`).join('');
   }
-  if (currentActTab==='act-cycling') renderCycling();
-  if (currentActTab==='act-stats')   renderActivityStats();
+  if (currentActTab==='act-stats') renderActivityStats();
 }
 
 function renderCycling() {
@@ -1448,44 +1911,44 @@ function renderActivityStats() {
   } else { calCard.classList.add('hidden'); }
 }
 
-function setActType(type) {
-  currentActType = type;
-  document.querySelectorAll('#act-type-tabs .tab').forEach(b=>b.classList.toggle('active',b.dataset.acttype===type));
-  ['af-cycling-fields','af-kb-fields','af-gym-fields','af-walk-fields',
-   'af-custom-name-group','af-gym-name-group','af-custom-dist-group'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.classList.add('hidden');
-  });
-  if (type==='Cycling')    document.getElementById('af-cycling-fields').classList.remove('hidden');
-  if (type==='Kettlebell') document.getElementById('af-kb-fields').classList.remove('hidden');
-  if (type==='Gym')        { document.getElementById('af-gym-fields').classList.remove('hidden'); document.getElementById('af-gym-name-group').classList.remove('hidden'); }
-  if (type==='Walking')    document.getElementById('af-walk-fields').classList.remove('hidden');
-  if (type==='Custom')     { document.getElementById('af-custom-name-group').classList.remove('hidden'); document.getElementById('af-custom-dist-group').classList.remove('hidden'); }
+// Fill activity name field from quick-pick suggestion
+function actQuickPick(name) {
+  const el = document.getElementById('af-name');
+  if (el) el.value = name;
+  el && el.focus();
 }
 
 async function saveActivity() {
-  const dur = parseFloat(document.getElementById('af-duration').value);
-  if (isNaN(dur)) { showToast('Enter duration'); return; }
+  const name = (document.getElementById('af-name').value || '').trim();
+  const dur  = toNumberOrNull(document.getElementById('af-duration').value);
+  if (!name) { showToast('Enter an activity name'); return; }
+  if (dur === null) { showToast('Enter duration'); return; }
   const id = 'a-'+currentProfile+'-'+Date.now();
+  // Only send columns that exist in the DB schema.
+  // All numeric fields go through toNumberOrNull — never send ''.
   const entry = {
-    id, profile_id:currentProfile,
-    type:     currentActType,
-    name:     currentActType==='Custom' ? (document.getElementById('af-custom-name').value||'Custom') : (currentActType==='Gym'?document.getElementById('af-gym-name').value||'Gym':currentActType),
-    date:     document.getElementById('af-date').value||todayStr(),
-    duration: dur,
-    calories: parseFloat(document.getElementById('af-calories').value)||0,
-    distance: parseFloat(document.getElementById('af-distance').value)||0,
-    speed:    document.getElementById('af-speed').value,
-    elevation:document.getElementById('af-elevation').value,
-    kbweight: document.getElementById('af-kbweight').value,
-    exercises:document.getElementById('af-exercises').value,
-    muscles:  document.getElementById('af-muscles').value,
-    steps:    document.getElementById('af-steps').value,
-    notes:    document.getElementById('af-notes').value,
+    id,
+    profile_id: currentProfile,
+    type:       name,   // use name as type for display logic
+    name,
+    date:       document.getElementById('af-date').value || todayStr(),
+    duration:   dur,
+    calories:   toNumberOrNull(document.getElementById('af-calories').value),
+    distance:   toNumberOrNull(document.getElementById('af-distance').value),
+    speed:      null,
+    elevation:  null,
+    kbweight:   null,
+    exercises:  null,
+    muscles:    null,
+    steps:      null,
+    notes:      document.getElementById('af-notes').value || null,
   };
   P().activities.push(entry);
   saveLocalCache(currentProfile);
   closeModal('modal-activity');
-  ['af-duration','af-calories','af-distance','af-speed','af-elevation','af-kbweight','af-exercises','af-muscles','af-steps','af-notes','af-custom-name','af-gym-name','af-walk-dist','af-custom-dist'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['af-name','af-duration','af-calories','af-distance','af-notes'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.value = '';
+  });
   showToast('✅ Activity saved');
   renderPage(currentPage);
   await pushToSupabase('activities', entry, currentProfile);
@@ -1580,24 +2043,49 @@ function styleNutBtn(btn, active, label) {
   }
 }
 
+// ── Meal template quick-picks per meal type ─────────────
+const MEAL_SUGGESTIONS = {
+  'Breakfast': ['Eggs','Oats + milk','Fruit','Bread + egg','Poha','Upma','Paratha','Dosa','Cornflakes'],
+  'Lunch':     ['Chicken + rice','Dal + roti','Egg curry + roti','Rajma + rice','Chole + rice','Sabzi + roti','Paneer + rice','Fish curry + rice','Mutton + rice'],
+  'Snack':     ['Fruit','Whey protein shake','Nuts','Yoghurt','Sprouts','Biscuits','Banana'],
+  'Dinner':    ['Chicken + salad','Dal + sabzi','Grilled fish','Egg bhurji + roti','Soup','Khichdi','Paneer bhurji'],
+  'Late Night':['Milk','Cinnamon water','Date','Light snack'],
+};
+
+function updateMealSuggestions() {
+  const meal = document.getElementById('me-meal-type').value;
+  const sugg = MEAL_SUGGESTIONS[meal] || [];
+  const el = document.getElementById('me-suggestions');
+  el.innerHTML = sugg.map(s =>
+    `<button class="tag" style="cursor:pointer;padding:5px 10px;font-size:12px" onclick="mealQuickPick('${s.replace(/'/g,"\\'")}')">
+      ${s}
+    </button>`
+  ).join('');
+}
+
+function mealQuickPick(desc) {
+  const el = document.getElementById('me-desc');
+  if (el) { el.value = desc; el.focus(); }
+}
+
 function openAddMealEntry(mealType) {
   document.getElementById('me-meal-type').value = mealType;
   openModal('modal-meal-entry');
+  updateMealSuggestions();
 }
 
 async function saveMealEntry() {
   const meal    = document.getElementById('me-meal-type').value;
   const desc    = document.getElementById('me-desc').value.trim();
-  if (!desc) { showToast('Enter a description'); return; }
+  if (!desc) { showToast('Enter what you ate'); return; }
   const protein = parseFloat(document.getElementById('me-protein').value)||0;
   const cals    = parseFloat(document.getElementById('me-cals').value)||0;
-  const notes   = document.getElementById('me-notes').value.trim();
   const entry   = getTodayNut();
   if (!entry.meals[meal]) entry.meals[meal] = [];
-  entry.meals[meal].push({ meal, desc, protein, calories:cals, notes });
+  entry.meals[meal].push({ meal, desc, protein, calories:cals, notes:'' });
   await saveTodayNut(entry);
   closeModal('modal-meal-entry');
-  ['me-desc','me-protein','me-cals','me-notes'].forEach(id=>document.getElementById(id).value='');
+  ['me-desc','me-protein','me-cals'].forEach(id=>document.getElementById(id).value='');
   showToast('✅ Meal saved');
   renderNutrition();
 }
@@ -1789,21 +2277,22 @@ function renderMilestones() {
   const sw   = sortedWeights();
   const lw   = latestWeight();
   const totalLost = +(( prof.startWeight||lw ) - lw).toFixed(1);
-  const rides = P().activities.filter(a=>a.type==='Cycling');
-  const totalKm = rides.reduce((s,a)=>s+(a.distance||0),0);
-  const range = (prof.startWeight||lw) - prof.goalWeight;
+  const range = (prof.startWeight||lw) - (prof.goalWeight||lw);
 
-  const weightMilestones = currentProfile==='kaveesh'
-    ? [{w:95},{w:90},{w:85},{w:80}]
-    : [{w:75},{w:70}];
+  // Weight milestones: every 5 kg from startWeight down to goalWeight
+  const startW = prof.startWeight || lw;
+  const goalW  = prof.goalWeight || 0;
+  const weightMilestones = [];
+  for (let w = Math.floor(startW/5)*5; w >= goalW; w -= 5) {
+    if (w < startW) weightMilestones.push({ w, icon: w <= goalW ? '🏆' : '⚡' });
+  }
 
   const milestones = [
-    { icon:'🚴', name:'First ride completed',  achieved:rides.length>0, date:rides[0]?.date },
-    { icon:'🛣️', name:'First 25 km ride',       achieved:rides.some(r=>(r.distance||0)>=25) },
-    { icon:'📅', name:'7 days of logging',     achieved:sw.length>=7 },
-    { icon:'💪', name:'5 kg lost',              achieved:totalLost>=5 },
-    { icon:'🔥', name:'10 kg lost',             achieved:totalLost>=10 },
-    ...weightMilestones.map(m=>({ icon:'⚡', name:`Reached ${m.w} kg`, achieved:lw<=m.w })),
+    { icon:'📅', name:'7 days of logging',  achieved:sw.length>=7 },
+    { icon:'📅', name:'14 days of logging', achieved:sw.length>=14 },
+    { icon:'💪', name:'5 units lost',        achieved:totalLost>=5 },
+    { icon:'🔥', name:'10 units lost',       achieved:totalLost>=10 },
+    ...weightMilestones.slice(0,6).map(m=>({ icon:m.icon, name:`Reached ${m.w} kg`, achieved:lw<=m.w })),
     ...([25,50,75,100]).map(p=>({ icon:p===100?'🏆':'🌟', name:`${p}% toward goal`, achieved: range>0 && totalLost/range*100>=p })),
   ];
 
@@ -1812,7 +2301,7 @@ function renderMilestones() {
       <div class="milestone-icon">${m.icon}</div>
       <div>
         <div class="milestone-name" style="color:${m.achieved?'var(--text)':'var(--muted)'}">${m.name}</div>
-        <div class="milestone-date">${m.achieved?'✅ Achieved'+(m.date?' · '+fmtDate(m.date,'D MMM YYYY'):''):'Pending'}</div>
+        <div class="milestone-date">${m.achieved?'✅ Achieved':'Pending'}</div>
       </div>
     </div>`).join('');
 }
@@ -1886,37 +2375,45 @@ function renderWeeklySummary() {
 }
 
 function renderCompare() {
-  const cards = ['kaveesh','mitali'].map(pid => {
-    const prof   = PROFILES[pid];
-    const ws     = [...DB[pid].weights].sort((a,b)=>a.date<b.date?-1:1);
-    const lw     = ws.length ? ws[ws.length-1].weight : (prof.startWeight||null);
+  const allProfiles = Object.values(PROFILES);
+  if (allProfiles.length < 2) {
+    document.getElementById('compare-content').innerHTML = `
+      <div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Add another profile to see the comparison.\nTap + New in the header.</div></div>`;
+    return;
+  }
+  const cards = allProfiles.map(prof => {
+    const pid  = prof.id;
+    if (!DB[pid]) return '';
+    const ws   = [...(DB[pid].weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+    const lw   = ws.length ? ws[ws.length-1].weight : (prof.startWeight||null);
     const startW = prof.startWeight || lw;
     const totalLost = startW&&lw ? +(startW - lw).toFixed(1) : 0;
     const range  = startW&&prof.goalWeight ? startW - prof.goalWeight : 1;
     const pct    = range>0 ? Math.max(0,Math.min(100,+(totalLost/range*100).toFixed(1))) : 0;
     const proj   = ws.length>=14 ? computeProjection(ws, prof) : null;
-    return `<div class="compare-card">
+    const col    = prof.color || '#7c6bff';
+    return `<div class="compare-card" style="border-color:${col}44">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div>
-          <div style="font-size:16px;font-weight:700">${prof.name}</div>
-          <div style="font-size:12px;color:var(--muted)">${startW?startW+' kg → ':''} ${prof.goalWeight} kg</div>
+          <div style="font-size:16px;font-weight:700;color:${col}">${prof.name}</div>
+          <div style="font-size:12px;color:var(--muted)">${startW?startW+' kg → ':''} ${prof.goalWeight||'—'} kg · ${prof.goalDate||'—'}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:24px;font-weight:800;color:var(--accent)">${pct.toFixed(1)}%</div>
+          <div style="font-size:24px;font-weight:800;color:${col}">${pct.toFixed(1)}%</div>
           <div style="font-size:10px;color:var(--muted)">toward goal</div>
         </div>
       </div>
-      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%;background:${col}"></div></div>
       <div class="grid-2" style="margin-top:12px;margin-bottom:0">
         <div><div class="stat-label">Current</div><div style="font-weight:700">${lw?lw+' kg':'—'}</div></div>
         <div><div class="stat-label">Lost</div><div style="font-weight:700;color:var(--accent3)">${totalLost>0?totalLost+' kg':'—'}</div></div>
       </div>
-      ${proj&&proj.projectedAtGoalDate?`<div style="font-size:12px;color:var(--muted);margin-top:8px">Projected Jan 1: ~${proj.projectedAtGoalDate} kg</div>`:''}
+      ${proj&&proj.projAtGoalDate?`<div style="font-size:12px;color:var(--muted);margin-top:8px">Projected: ~${proj.projAtGoalDate} kg by ${fmtDate(prof.goalDate,'D MMM YYYY')}</div>`:''}
     </div>`;
-  });
+  }).join('');
   document.getElementById('compare-content').innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Progress shown relative to each person's own starting weight and goal.</div>
-    ${cards.join('')}`;
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Progress shown relative to each person's own goal.</div>
+    ${cards}`;
 }
 
 function renderDataSummary() {
@@ -1934,17 +2431,23 @@ function renderDataSummary() {
     <div class="habit-row">
       <div><div class="habit-label">Water Target</div><div class="habit-time">${s.water_target||3}L / day</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openModal_nutSettings()">Edit</button>
+    </div>
+    <div class="habit-row" style="border-bottom:none">
+      <div><div class="habit-label">Edit Profile</div><div class="habit-time">${PROF().name}</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="openCreateProfileModal('${currentProfile}')">Edit</button>
     </div>`;
 }
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════
 function exportCurrentProfile() {
   const data = { profile:currentProfile, weights:P().weights, activities:P().activities, nutrition:P().nutrition, habits:P().habits, habitDefs:P().habitDefs, settings:P().settings };
-  downloadJSON(data, 'project80_'+currentProfile+'.json');
+  downloadJSON(data, 'momentum_'+currentProfile+'.json');
   showToast('📤 Exported '+PROF().name);
 }
 function exportAllProfiles() {
-  downloadJSON({ kaveesh:DB.kaveesh, mitali:DB.mitali }, 'project80_all.json');
+  const all = {};
+  Object.keys(PROFILES).forEach(pid => { all[pid] = DB[pid]; });
+  downloadJSON({ profiles: Object.values(PROFILES), data: all }, 'momentum_all.json');
   showToast('📦 All profiles exported');
 }
 function downloadJSON(data, filename) {
@@ -2100,7 +2603,9 @@ function importData() {
 async function runImport(data) {
   // ── Detect format ──────────────────────────────────────
   const isV2Single  = !!(data.profile && (data.weights || data.activities || data.nutrition || data.habits));
-  const isV2All     = !!(data.kaveesh || data.mitali) && !data.profile;
+  // New all-profiles format has data.profiles array and data.data object
+  // Old format had top-level kaveesh/mitali keys
+  const isV2All     = !!(data.profiles && data.data) || (!!(data.kaveesh || data.mitali) && !data.profile);
   const isLegacyV1  = !isV2Single && !isV2All && (data.weights || data.activities || data.nutrition || data.habits);
 
   if (!isV2Single && !isV2All && !isLegacyV1) {
@@ -2184,9 +2689,20 @@ async function importV2SingleProfile(data) {
 
 // ── Format 2: v2 all-profiles ─────────────────────────────
 async function importV2AllProfiles(data) {
-  for (const pid of ['kaveesh', 'mitali']) {
-    if (!data[pid]) continue;
-    const d = data[pid];
+  // Support both old {kaveesh:{...},mitali:{...}} and new {profiles:[...],data:{pid:{...}}}
+  let profileData = {};
+  if (data.data) {
+    profileData = data.data;
+  } else {
+    // Old format: top-level keys are profile IDs
+    Object.keys(data).forEach(k => { if (typeof data[k] === 'object' && data[k].weights) profileData[k] = data[k]; });
+  }
+
+  const allPids = Object.keys(profileData);
+  for (const pid of allPids) {
+    if (!profileData[pid]) continue;
+    ensureProfileDB(pid);
+    const d = profileData[pid];
     if (d.weights)    DB[pid].weights    = (d.weights    || []).map(w => ({ ...w, profile_id: pid, id: w.id || ('w-'+pid+'-'+w.date.replace(/-/g,'')) }));
     if (d.activities) DB[pid].activities = (d.activities || []).map(a => ({ ...a, id: String(a.id), profile_id: pid }));
     if (d.nutrition)  DB[pid].nutrition  = (d.nutrition  || []).map(n => ({ ...n, profile_id: pid, id: n.id || ('n-'+pid+'-'+n.date.replace(/-/g,'')) }));
@@ -2196,10 +2712,10 @@ async function importV2AllProfiles(data) {
     saveLocalCache(pid);
   }
 
-  showToast('Importing both profiles — syncing…');
+  showToast('Importing profiles — syncing…');
   const allErrors = [];
-  for (const pid of ['kaveesh', 'mitali']) {
-    if (!data[pid]) continue;
+  for (const pid of allPids) {
+    if (!profileData[pid]) continue;
     const result = await pushImportedDataToSupabase(pid, {});
     if (!result.success) allErrors.push(...result.errors);
     await loadProfileFromSupabase(pid);
@@ -2210,13 +2726,15 @@ async function importV2AllProfiles(data) {
     console.error('Import sync errors:', allErrors);
     showToast('❌ Import failed — ' + allErrors.length + ' records could not be synced. Check console.');
   } else {
-    showToast('✅ Both profiles imported and synced');
+    showToast('✅ All profiles imported and synced');
   }
 }
 
-// ── Format 3: Legacy v1 (belongs to Kaveesh) ─────────────
+// ── Format 3: Legacy v1 (belongs to first/kaveesh profile) ──
 async function importLegacyV1(data) {
-  const pid = 'kaveesh';
+  const pid = PROFILES['kaveesh'] ? 'kaveesh' : Object.keys(PROFILES)[0];
+  if (!pid) { showToast('No profile to import into'); return; }
+  ensureProfileDB(pid);
   let wCount = 0, aCount = 0, nCount = 0, hCount = 0;
 
   // ── Weights: merge by date, prefer legacy when it has body-fat/waist
