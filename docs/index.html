@@ -1486,6 +1486,9 @@ async function deleteCurrentProfile() {
     // ── Delete all child data from Supabase ──
     if (sb && isOnline) {
       const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      for (const table of tables) {
+        const { error } = await sb.from(table).delete().eq('profile_id', editId);
+        if (error) console.warn(`[deleteProfile] ${table} delete error:`, error.message);
       }
       // Delete the profile row itself
       const { error: profErr } = await sb.from('profiles').delete().eq('id', editId);
@@ -3104,6 +3107,8 @@ function renderMore() {
   if (currentMoreTab==='more-compare')      renderCompare();
   if (currentMoreTab==='more-data')         renderDataSummary();
 }
+
+function renderMilestones() {
   const prof = PROF();
   const sw   = sortedWeights();
   const lw   = latestWeight();
@@ -3289,6 +3294,9 @@ async function deleteProfileFromSettings(pid) {
   try {
     if (sb && isOnline) {
       const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      for (const table of tables) {
+        const { error } = await sb.from(table).delete().eq('profile_id', pid);
+        if (error) console.warn(`[deleteProfile] ${table}:`, error.message);
       }
       const { error: profErr } = await sb.from('profiles').delete().eq('id', pid);
       if (profErr) console.warn('[deleteProfile] profiles:', profErr.message);
