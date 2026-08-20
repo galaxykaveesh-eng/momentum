@@ -118,6 +118,18 @@
       <div class="stat-tile"><div class="stat-label">14-Day Avg</div><div class="stat-val" id="dash-avg14">—</div></div>
     </div>
 
+    <!-- Goal Forecast card -->
+    <div class="card" id="dash-forecast-card" style="margin-bottom:10px">
+      <div class="card-title">📈 Goal Forecast</div>
+      <div id="dash-forecast-content"></div>
+    </div>
+
+    <!-- Key Trends card -->
+    <div class="card" id="dash-trends-card" style="margin-bottom:10px">
+      <div class="card-title">💡 Key Trends</div>
+      <div id="dash-trends-content"></div>
+    </div>
+
     <!-- Projection card -->
     <div class="card" id="dash-proj-card">
       <div class="card-title">🎯 Goal Projection</div>
@@ -325,13 +337,17 @@
     <div class="tabs" id="more-tabs" style="overflow-x:auto">
       <button class="tab active" data-mtab="more-milestones">🏆 Goals</button>
       <button class="tab" data-mtab="more-weekly">📊 Week</button>
+      <button class="tab" data-mtab="more-monthly">📅 Month</button>
+      <button class="tab" data-mtab="more-timeline">⏳ Journey</button>
       <button class="tab" data-mtab="more-insights">💡 Insights</button>
       <button class="tab" data-mtab="more-achievements">🎖 Awards</button>
       <button class="tab" data-mtab="more-compare">⚖ Compare</button>
       <button class="tab" data-mtab="more-data">💾 Data</button>
     </div>
     <div id="more-milestones"><div class="card"><div class="card-title">Milestones</div><div id="milestone-list"></div></div></div>
-    <div id="more-weekly" class="hidden"><div id="weekly-summary-content"></div></div>
+    <div id="more-weekly"  class="hidden"><div id="weekly-summary-content"></div></div>
+    <div id="more-monthly" class="hidden"><div id="monthly-review-content"></div></div>
+    <div id="more-timeline" class="hidden"><div id="timeline-content"></div></div>
     <div id="more-insights" class="hidden"><div id="insights-content"></div></div>
     <div id="more-achievements" class="hidden"><div id="achievements-content"></div></div>
     <div id="more-compare" class="hidden"><div id="compare-content"></div></div>
@@ -718,7 +734,7 @@ let selectedProfileColor = '#7c6bff';  // for create-profile modal
 let selectedHabitRecs    = new Set();  // habit recs chosen in create modal
 
 // Per-profile data — keyed by profile id, created dynamically
-const DB = {};  // { [pid]: { weights, activities, nutrition, habits, habitDefs, settings, achievements, reviews } }
+const DB = {};  // { [pid]: { weights, activities, nutrition, habits, habitDefs, settings, achievements, reviews, monthlyReviews } }
 
 // ── Charts map ────────────────────────────────────────────
 const charts = {};
@@ -729,6 +745,7 @@ function memoKey(fn, pid) { return fn+'::'+pid; }
 function memoGet(fn, pid) { return _memo[memoKey(fn,pid)]; }
 function memoSet(fn, pid, val) { _memo[memoKey(fn,pid)] = val; return val; }
 function memoClear(pid) { Object.keys(_memo).forEach(k=>{ if(k.endsWith('::'+pid)) delete _memo[k]; }); }
+// Note: goalForecast and trends keys follow the same ::pid pattern and are cleared automatically.
 
 // ══ BOOT ═════════════════════════════════════════════════
 async function boot() {
@@ -784,14 +801,16 @@ async function boot() {
     // Init more tabs
     setupTabGroup('more-tabs', 'mtab', id => {
       currentMoreTab = id;
-      ['more-milestones','more-weekly','more-insights','more-achievements','more-compare','more-data'].forEach(x =>
+      ['more-milestones','more-weekly','more-monthly','more-timeline','more-insights','more-achievements','more-compare','more-data'].forEach(x =>
         document.getElementById(x).classList.toggle('hidden', x!==id)
       );
-      if (id==='more-weekly')      renderWeeklySummary();
-      if (id==='more-insights')    renderInsights();
+      if (id==='more-weekly')       renderWeeklySummary();
+      if (id==='more-monthly')      renderMonthlyReviews();
+      if (id==='more-timeline')     renderWinsTimeline();
+      if (id==='more-insights')     renderInsights();
       if (id==='more-achievements') renderAchievements();
-      if (id==='more-compare')     renderCompare();
-      if (id==='more-data')        renderDataSummary();
+      if (id==='more-compare')      renderCompare();
+      if (id==='more-data')         renderDataSummary();
     });
 
     // Migrate old single-profile localStorage data to first profile
@@ -834,7 +853,7 @@ function lsSave(profile, table, val) {
 
 function ensureProfileDB(pid) {
   if (!DB[pid]) {
-    DB[pid] = { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{}, achievements:[], reviews:[] };
+    DB[pid] = { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{}, achievements:[], reviews:[], monthlyReviews:[] };
   }
 }
 
@@ -848,8 +867,9 @@ function loadLocalCache() {
     DB[pid].habits       = lsLoad(pid,'habits',     {});
     DB[pid].habitDefs    = lsLoad(pid,'habitDefs',  []);
     DB[pid].settings     = lsLoad(pid,'settings',   defaultSettings(pid));
-    DB[pid].achievements = lsLoad(pid,'achievements',[]);
-    DB[pid].reviews      = lsLoad(pid,'reviews',    []);
+    DB[pid].achievements  = lsLoad(pid,'achievements',[]);
+    DB[pid].reviews       = lsLoad(pid,'reviews',    []);
+    DB[pid].monthlyReviews= lsLoad(pid,'monthlyReviews',[]);
   }
 }
 
@@ -862,8 +882,9 @@ function saveLocalCache(profile) {
   lsSave(profile,'habits',       d.habits);
   lsSave(profile,'habitDefs',    d.habitDefs);
   lsSave(profile,'settings',     d.settings);
-  lsSave(profile,'achievements', d.achievements);
-  lsSave(profile,'reviews',      d.reviews);
+  lsSave(profile,'achievements',  d.achievements);
+  lsSave(profile,'reviews',       d.reviews);
+  lsSave(profile,'monthlyReviews',d.monthlyReviews);
 }
 
 // ══ SUPABASE SYNC ════════════════════════════════════════
@@ -933,7 +954,7 @@ async function loadAllFromSupabase() {
 async function loadProfileFromSupabase(pid) {
   if (!sb || !isOnline) return;
   try {
-    const [wRes, aRes, nRes, hRes, hdRes, sRes, achRes, revRes] = await Promise.all([
+    const [wRes, aRes, nRes, hRes, hdRes, sRes, achRes, revRes, mRevRes] = await Promise.all([
       sb.from('weights').select('*').eq('profile_id', pid).order('date'),
       sb.from('activities').select('*').eq('profile_id', pid).order('date'),
       sb.from('nutrition').select('*').eq('profile_id', pid).order('date'),
@@ -942,6 +963,7 @@ async function loadProfileFromSupabase(pid) {
       sb.from('settings').select('*').eq('profile_id', pid).maybeSingle(),
       sb.from('achievements').select('*').eq('profile_id', pid).order('earned_at'),
       sb.from('weekly_reviews').select('*').eq('profile_id', pid).order('week_start', { ascending:false }),
+      sb.from('monthly_reviews').select('*').eq('profile_id', pid).order('month_start', { ascending:false }),
     ]);
 
     if (!wRes.error  && wRes.data)  { DB[pid].weights    = wRes.data.map(r=>({...r})); }
@@ -988,6 +1010,30 @@ async function loadProfileFromSupabase(pid) {
       (DB[pid].reviews||[]).forEach(r => { localMap[r.weekStart] = r; });
       DB[pid].reviews = Object.values({ ...localMap, ...remoteMap })
         .sort((a,b) => b.weekStart > a.weekStart ? 1 : -1);
+    }
+
+    // Monthly reviews
+    if (!mRevRes.error && mRevRes.data && mRevRes.data.length > 0) {
+      const remoteMMap = {};
+      mRevRes.data.forEach(r => {
+        remoteMMap[r.month_start] = {
+          monthStart:   r.month_start,
+          monthEnd:     r.month_end,
+          monthLabel:   r.month_label,
+          stars:        r.stars,
+          category:     r.category,
+          narrative:    r.narrative,
+          weightChange: r.weight_change,
+          workouts:     r.workouts,
+          habitPct:     r.habit_pct,
+          waterDays:    r.water_days,
+          generatedAt:  r.generated_at,
+        };
+      });
+      const localMMap = {};
+      (DB[pid].monthlyReviews||[]).forEach(r => { localMMap[r.monthStart] = r; });
+      DB[pid].monthlyReviews = Object.values({ ...localMMap, ...remoteMMap })
+        .sort((a,b) => b.monthStart > a.monthStart ? 1 : -1);
     }
 
     memoClear(pid);
@@ -1452,6 +1498,10 @@ async function saveProfile() {
     closeModal('modal-create-profile');
     showToast(editId ? '✅ Profile updated' : '✅ Profile created — log your first weight!');
 
+    // Clear memo cache so forecast, trends, and streaks recompute
+    // with the new goalWeight / goalDate / goalType immediately.
+    memoClear(pid);
+
     // Switch to the new / edited profile
     currentProfile = pid;
     localStorage.setItem('momentum_last_profile', pid);
@@ -1485,7 +1535,7 @@ async function deleteCurrentProfile() {
   try {
     // ── Delete all child data from Supabase ──
     if (sb && isOnline) {
-      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews','monthly_reviews'];
       for (const table of tables) {
         const { error } = await sb.from(table).delete().eq('profile_id', editId);
         if (error) console.warn(`[deleteProfile] ${table} delete error:`, error.message);
@@ -1500,7 +1550,7 @@ async function deleteCurrentProfile() {
     delete DB[editId];
 
     // ── Remove from localStorage ──
-    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews'].forEach(t => {
+    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews','monthlyReviews'].forEach(t => {
       localStorage.removeItem(lsKey(editId, t));
     });
     lsSave('_app', 'profiles', Object.values(PROFILES));
@@ -1880,7 +1930,9 @@ function renderDashboard() {
     renderWeightChart('chart-dash-weight', sw.slice(-30), true, null, prof.goalWeight);
   } else { chartCard.classList.add('hidden'); }
 
-  // New cards (non-blocking, run after main render)
+  // New v1.2 dashboard cards
+  renderDashboardForecast();
+  renderDashboardTrends();
   renderDashboardStreaks();
   renderDashboardWeekSummary();
   renderDashboardRecentAchievement();
@@ -2013,6 +2065,7 @@ async function saveWeight() {
 
 async function deleteWeight(id) {
   P().weights = P().weights.filter(w=>w.id!==id);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   showToast('Deleted');
   renderPage('weight');
@@ -2150,6 +2203,7 @@ async function saveActivity() {
 
 async function deleteActivity(id) {
   P().activities = P().activities.filter(a=>a.id!==id);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   showToast('Deleted');
   renderPage('activity');
@@ -2166,6 +2220,7 @@ function getTodayNut() {
 async function saveTodayNut(entry) {
   P().nutrition = P().nutrition.filter(n=>n.date!==todayStr());
   P().nutrition.push(entry);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   await pushToSupabase('nutrition', entry, currentProfile);
 }
@@ -2317,6 +2372,7 @@ async function saveNutSettings() {
   const w = parseFloat(document.getElementById('ns-water-target').value)||3;
   P().settings.protein_target = p;
   P().settings.water_target   = w;
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   await pushToSupabase('settings', { profile_id:currentProfile, data:P().settings, id:'s-'+currentProfile }, currentProfile);
   closeModal('modal-nut-settings');
@@ -2414,6 +2470,7 @@ function renderHabits() {
 async function toggleHabit(id) {
   if (!P().habits[habitViewDate]) P().habits[habitViewDate] = {};
   P().habits[habitViewDate][id] = !P().habits[habitViewDate][id];
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   renderHabits();
   // Sync habits row for this date
@@ -2465,6 +2522,7 @@ async function saveHabitDef() {
     P().habitDefs.push(changedHabit);
   }
   saveLocalCache(currentProfile);
+  memoClear(currentProfile);
 
   // Only push the one changed record — not all definitions
   if (changedHabit) {
@@ -2482,6 +2540,7 @@ async function toggleHabitEnabled(id) {
   const idx = P().habitDefs.findIndex(h => h.id === id);
   if (idx < 0) return;
   P().habitDefs[idx] = { ...P().habitDefs[idx], enabled: !P().habitDefs[idx].enabled };
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   await pushToSupabase('habit_definitions', P().habitDefs[idx], currentProfile);
   renderHabits();
@@ -2489,6 +2548,7 @@ async function toggleHabitEnabled(id) {
 
 async function deleteHabitDef(id) {
   P().habitDefs = P().habitDefs.filter(h => h.id !== id);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   renderHabits();
   await deleteFromSupabase('habit_definitions', id, currentProfile);
@@ -3465,9 +3525,742 @@ function exportAllProfilesCSV() {
 
 // ══ UPDATED renderMore ═══════════════════════════════════
 
+// ══════════════════════════════════════════════════════════
+// ══ v1.2 INTELLIGENCE ENGINES ════════════════════════════
+// ══════════════════════════════════════════════════════════
+
+// ── 1. GOAL FORECAST ─────────────────────────────────────
+// Uses rolling 30d average weight change to project goal date.
+// Returns null when insufficient data. Never projects below goal.
+function computeGoalForecast(pid) {
+  const cached = memoGet('goalForecast', pid);
+  if (cached !== undefined) return cached;
+
+  const d    = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d || !prof || !prof.goalWeight || !prof.goalDate) return memoSet('goalForecast', pid, null);
+
+  const sw = [...(d.weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+  if (sw.length < 7) return memoSet('goalForecast', pid, { status:'insufficient', need: 7-sw.length });
+
+  const goalWeight = prof.goalWeight;
+  const goalDate   = prof.goalDate;
+  const lw         = sw[sw.length-1].weight;
+  const daysLeft   = daysUntil(goalDate);
+  const isGain     = goalWeight > (sw[0]?.weight || lw);
+
+  // ── Goal reached check ────────────────────────────────────
+  // If current weight is at or past goal, projections are not applicable.
+  // Tolerance: 0.1 kg to account for scale precision.
+  const goalReached = isGain ? lw >= goalWeight - 0.1 : lw <= goalWeight + 0.1;
+  if (goalReached) {
+    return memoSet('goalForecast', pid, {
+      status: 'goal-reached',
+      lw, goalWeight, daysLeft,
+      dataPoints: sw.length,
+    });
+  }
+
+  // Rolling 30d rate
+  const w30 = sw.slice(-Math.min(sw.length,30));
+  let rate30 = null; // kg/day (negative = losing)
+  if (w30.length >= 7) {
+    const span = dateDiffDays(w30[0].date, w30[w30.length-1].date) || 1;
+    rate30 = (w30[w30.length-1].weight - w30[0].weight) / span;
+  }
+
+  // Rolling 14d rate
+  const w14 = sw.slice(-Math.min(sw.length,14));
+  let rate14 = null;
+  if (w14.length >= 7) {
+    const span = dateDiffDays(w14[0].date, w14[w14.length-1].date) || 1;
+    rate14 = (w14[w14.length-1].weight - w14[0].weight) / span;
+  }
+
+  // Use 14d rate if recent, 30d for stability; blend if both exist
+  let currentRate = rate14 ?? rate30;
+  if (rate14 !== null && rate30 !== null) {
+    currentRate = (rate14 * 0.6 + rate30 * 0.4); // weight recent data more
+  }
+
+  const currentWeekly = currentRate !== null ? +(currentRate * 7).toFixed(2) : null;
+
+  // Required rate to reach goal by goalDate
+  const requiredRate = daysLeft > 0 ? (goalWeight - lw) / daysLeft : null; // kg/day (neg=losing)
+  const requiredWeekly = requiredRate !== null ? +(requiredRate * 7).toFixed(2) : null;
+
+  // Estimate goal date at current pace
+  let estimatedDate = null;
+  let estimatedDateStr = null;
+  if (currentRate !== null && Math.abs(currentRate) > 0.005) {
+    const daysToGoal = (goalWeight - lw) / currentRate;
+    if (daysToGoal > 0 && daysToGoal < 3650) {
+      const ed = new Date();
+      ed.setDate(ed.getDate() + Math.round(daysToGoal));
+      estimatedDate = ed;
+      estimatedDateStr = ed.toISOString().slice(0,10);
+    }
+  }
+
+  // Status
+  let status = 'unknown';
+  if (currentRate !== null && requiredRate !== null) {
+    if (isGain) {
+      // Gaining: current should be ≥ required
+      if (currentRate >= requiredRate * 0.95)       status = 'ahead';
+      else if (currentRate >= requiredRate * 0.70)  status = 'on-track';
+      else                                           status = 'behind';
+    } else {
+      // Losing: current (negative) should be ≤ required (negative)
+      if (currentRate <= requiredRate * 0.95)       status = 'ahead';
+      else if (currentRate <= requiredRate * 0.70)  status = 'on-track';
+      else if (currentRate < 0)                     status = 'behind';
+      else                                           status = 'gaining';
+    }
+  }
+
+  // ── Confidence scoring ───────────────────────────────────
+  // Three factors: data volume, logging consistency, weight volatility.
+  // Returns { level: 'high'|'medium'|'low', reason: string }
+  const totalEntries = sw.length;
+
+  // Logging gap: days since the last entry
+  const lastEntryDate = sw[sw.length-1].date;
+  const daysSinceLog  = dateDiffDays(lastEntryDate, todayStr());
+
+  // Weight volatility: std deviation of day-to-day changes
+  let volatility = 0;
+  if (sw.length >= 4) {
+    const deltas = [];
+    for (let i=1;i<sw.length;i++) {
+      const span = dateDiffDays(sw[i-1].date, sw[i].date) || 1;
+      deltas.push((sw[i].weight - sw[i-1].weight) / span);
+    }
+    const mean = deltas.reduce((s,d)=>s+d,0)/deltas.length;
+    volatility = Math.sqrt(deltas.reduce((s,d)=>s+(d-mean)**2,0)/deltas.length);
+    volatility = +volatility.toFixed(3); // kg/day std dev
+  }
+
+  // Score: 0–100; three sub-scores averaged
+  const dataScore    = Math.min(100, totalEntries / 30 * 100);   // 30+ days = 100
+  const freshScore   = daysSinceLog === 0 ? 100 : daysSinceLog <= 2 ? 75 : daysSinceLog <= 7 ? 40 : 10;
+  const stabScore    = volatility < 0.05 ? 100 : volatility < 0.12 ? 70 : volatility < 0.25 ? 40 : 15;
+  const confScore    = Math.round((dataScore + freshScore + stabScore) / 3);
+
+  let confidence, confReason;
+  if (confScore >= 68) {
+    confidence = 'high';
+    confReason = 'Based on consistent daily logging with stable data.';
+  } else if (confScore >= 40) {
+    confidence = 'medium';
+    confReason = daysSinceLog > 3 ? 'Log daily to improve accuracy.' :
+                 totalEntries < 14 ? 'More data will sharpen this estimate.' :
+                 'Weight fluctuations are affecting reliability.';
+  } else {
+    confidence = 'low';
+    confReason = daysSinceLog > 7 ? 'Weight hasn\'t been logged recently — re-start daily logging.' :
+                 totalEntries < 7 ? 'Need at least 7 weigh-ins for a meaningful estimate.' :
+                 'High day-to-day variation makes projections unreliable.';
+  }
+
+  const result = {
+    status, currentWeekly, requiredWeekly,
+    estimatedDateStr, lw, goalWeight, daysLeft,
+    dataPoints: sw.length,
+    confidence, confReason, confScore,
+  };
+  return memoSet('goalForecast', pid, result);
+}
+
+function renderDashboardForecast() {
+  const el = document.getElementById('dash-forecast-content');
+  if (!el) return;
+  const fc = computeGoalForecast(currentProfile);
+  if (!fc) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Set a goal weight and date to see your forecast.</div>'; return; }
+  if (fc.status === 'insufficient') {
+    el.innerHTML = `<div style="font-size:13px;color:var(--muted)">Log ${fc.need} more day${fc.need>1?'s':''} of weight data to generate your forecast.</div>`; return;
+  }
+
+  if (fc.status === 'goal-reached') {
+    el.innerHTML = `
+      <div style="text-align:center;padding:8px 0">
+        <div style="font-size:32px;margin-bottom:6px">🎯</div>
+        <div style="font-size:16px;font-weight:800;color:var(--accent3);margin-bottom:4px">Goal Achieved!</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5">You've reached ${fc.goalWeight} kg. Update your goal weight in Profile Settings to continue tracking progress.</div>
+      </div>`;
+    return;
+  }
+
+  const statusMap = {
+    ahead:     { icon:'🟢', label:'Ahead of Schedule', col:'var(--accent3)' },
+    'on-track':{ icon:'🟡', label:'On Track',          col:'var(--warning)'  },
+    behind:    { icon:'🔴', label:'Behind Schedule',   col:'var(--accent2)'  },
+    gaining:   { icon:'🔴', label:'Trending Up',       col:'var(--accent2)'  },
+    unknown:   { icon:'⚪', label:'Calculating…',      col:'var(--muted)'    },
+  };
+  const confMap = {
+    high:   { col:'var(--accent3)', label:'High confidence' },
+    medium: { col:'var(--warning)', label:'Medium confidence' },
+    low:    { col:'var(--accent2)', label:'Low confidence' },
+  };
+  const s = statusMap[fc.status] || statusMap.unknown;
+  const c = confMap[fc.confidence] || confMap.medium;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">${s.icon}</span>
+        <span style="font-size:14px;font-weight:700;color:${s.col}">${s.label}</span>
+      </div>
+      <div title="${fc.confReason}" style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${c.col};cursor:help;border-bottom:1px dashed ${c.col}">${c.label}</div>
+    </div>
+    <div class="grid-2" style="margin-bottom:0">
+      <div>
+        <div class="stat-label">Current Pace</div>
+        <div style="font-size:18px;font-weight:700;color:${fc.currentWeekly<0?'var(--accent3)':fc.currentWeekly>0?'var(--accent2)':'var(--muted)'}">${fc.currentWeekly!==null?(fc.currentWeekly>0?'+':'')+fc.currentWeekly+' kg/wk':'—'}</div>
+      </div>
+      <div>
+        <div class="stat-label">Required Pace</div>
+        <div style="font-size:18px;font-weight:700">${fc.requiredWeekly!==null?(fc.requiredWeekly>0?'+':'')+fc.requiredWeekly+' kg/wk':'—'}</div>
+      </div>
+      <div>
+        <div class="stat-label">Est. Goal Date</div>
+        <div style="font-size:13px;font-weight:700">${fc.estimatedDateStr?fmtDate(fc.estimatedDateStr,'D MMM YYYY'):'—'}</div>
+      </div>
+      <div>
+        <div class="stat-label">Days Remaining</div>
+        <div style="font-size:18px;font-weight:700;color:var(--accent)">${fc.daysLeft>0?fc.daysLeft:'—'}</div>
+      </div>
+    </div>
+    ${fc.confidence!=='high'?`<div style="font-size:11px;color:var(--muted);margin-top:8px;font-style:italic">${fc.confReason}</div>`:''}`;
+}
+
+// ── 2. TREND DETECTION ENGINE ─────────────────────────────
+// Scans last 4-8 weeks of data for meaningful patterns.
+// Returns up to 5 insights, prioritised by significance.
+function computeTrendInsights(pid) {
+  const cached = memoGet('trends', pid);
+  if (cached !== undefined) return cached;
+
+  const d    = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d) return memoSet('trends', pid, []);
+
+  const now  = new Date(); now.setHours(0,0,0,0);
+  const ago7  = dk => { const dt=new Date(now); dt.setDate(now.getDate()-7);  return dt.toISOString().slice(0,10); };
+  const ago14 = dk => { const dt=new Date(now); dt.setDate(now.getDate()-14); return dt.toISOString().slice(0,10); };
+  const ago28 = dk => { const dt=new Date(now); dt.setDate(now.getDate()-28); return dt.toISOString().slice(0,10); };
+  const ago56 = dk => { const dt=new Date(now); dt.setDate(now.getDate()-56); return dt.toISOString().slice(0,10); };
+
+  const d7s  = ago7();  const d14s = ago14(); const d28s = ago28(); const d56s = ago56();
+
+  const sw   = [...(d.weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+  const insights = [];
+
+  // ── Weight trend ─────────────────────────────────────────
+  // Compare recent 14d average vs prior 14d average.
+  // Recency check: inspect last 7 days independently.
+  // If the 14d trend is down but the last 7 days is net positive (gaining),
+  // suppress the positive insight — it would be misleading.
+  if (sw.length >= 14) {
+    const recent14 = sw.filter(w=>w.date>=d14s);
+    const prev14   = sw.filter(w=>w.date>=d28s&&w.date<d14s);
+    const last7    = sw.filter(w=>w.date>=d7s);
+
+    if (recent14.length >= 5 && prev14.length >= 5) {
+      const rAvg = recent14.reduce((s,w)=>s+w.weight,0)/recent14.length;
+      const pAvg = prev14.reduce((s,w)=>s+w.weight,0)/prev14.length;
+      const delta14 = +(rAvg-pAvg).toFixed(1);
+      const isLoss  = prof?.goalType==='lose_weight';
+
+      // Last-7d direction: compare first and last entries in the last 7 days
+      let last7Direction = 0; // positive = gaining, negative = losing
+      if (last7.length >= 2) {
+        last7Direction = last7[last7.length-1].weight - last7[0].weight;
+      }
+
+      if (delta14 < -0.5) {
+        if (last7Direction > 0.3) {
+          // 14d trend is down but last 7 days is reversing — add a caveat
+          insights.push({ priority:8, icon:'⚠', type:'warning',
+            text:`Weight has been trending down over 2 weeks (avg −${Math.abs(delta14)} kg), but the last 7 days show a slight uptick — keep watching.` });
+        } else {
+          // Clean downward trend — confident positive insight
+          insights.push({ priority:10, icon:'✓', type:'positive',
+            text:`Weight is trending down — ${Math.abs(delta14)} kg lower on average than the previous 2 weeks.` });
+        }
+      } else if (delta14 > 0.5 && isLoss) {
+        insights.push({ priority:8, icon:'⚠', type:'warning',
+          text:`Weight average is up ${delta14} kg compared to 2 weeks ago — a trend to watch.` });
+      }
+    }
+  }
+
+  // ── Workout consistency ───────────────────────────────────
+  const actsRecent = (d.activities||[]).filter(a=>a.date>=d28s).length;
+  const actsPrev   = (d.activities||[]).filter(a=>a.date>=d56s&&a.date<d28s).length;
+  if (actsRecent > 0 || actsPrev > 0) {
+    if (actsRecent >= actsPrev * 1.4 && actsRecent >= 4)
+      insights.push({ priority:9, icon:'✓', type:'positive', text:`Workout frequency is up — ${actsRecent} sessions in the last 4 weeks vs ${actsPrev} the 4 weeks before.` });
+    else if (actsPrev > 0 && actsRecent < actsPrev * 0.6)
+      insights.push({ priority:8, icon:'⚠', type:'warning', text:`Workout frequency has dropped — ${actsRecent} sessions in the last 4 weeks vs ${actsPrev} previously.` });
+  }
+
+  // ── Habit completion trend ────────────────────────────────
+  const enabled = (d.habitDefs||[]).filter(h=>h.enabled);
+  if (enabled.length >= 2) {
+    const habitPctFor = (start, end) => {
+      const days = []; let dt = new Date(start);
+      while (dt.toISOString().slice(0,10) < end && days.length < 28) {
+        days.push(dt.toISOString().slice(0,10)); dt.setDate(dt.getDate()+1);
+      }
+      if (!days.length) return null;
+      const total = days.reduce((s,dk)=>{const dh=(d.habits||{})[dk]||{};return s+enabled.filter(h=>dh[h.id]).length;},0);
+      return Math.round(total/(enabled.length*days.length)*100);
+    };
+    const hp14  = habitPctFor(d14s, now.toISOString().slice(0,10));
+    const hp28  = habitPctFor(d28s, d14s);
+    if (hp14!==null && hp28!==null) {
+      if (hp14 >= hp28 + 15 && hp14 >= 60)
+        insights.push({ priority:9, icon:'✓', type:'positive', text:`Habit completion is improving — ${hp14}% in the last 2 weeks vs ${hp28}% the 2 weeks before.` });
+      else if (hp14 <= hp28 - 15 && hp28 >= 50)
+        insights.push({ priority:7, icon:'⚠', type:'warning', text:`Habit completion dropped from ${hp28}% to ${hp14}% — worth revisiting your routine.` });
+    }
+
+    // Best habit completion month?
+    const currentMonthStart = now.toISOString().slice(0,8)+'01';
+    const monthHp = habitPctFor(currentMonthStart, now.toISOString().slice(0,10));
+    const lastMonthDt = new Date(now); lastMonthDt.setMonth(lastMonthDt.getMonth()-1);
+    const lmStart = lastMonthDt.toISOString().slice(0,8)+'01';
+    const lastMonthHp = habitPctFor(lmStart, currentMonthStart);
+    if (monthHp !== null && monthHp >= 80 && (lastMonthHp===null||monthHp>lastMonthHp+5))
+      insights.push({ priority:8, icon:'✓', type:'positive', text:`This is shaping up to be your strongest month for habit consistency at ${monthHp}%.` });
+  }
+
+  // ── Water goal consistency ────────────────────────────────
+  const waterTarget = (d.settings||{}).water_target || 3;
+  const waterRecent = (d.nutrition||[]).filter(n=>n.date>=d14s&&(n.water||0)>=waterTarget).length;
+  const waterPrev   = (d.nutrition||[]).filter(n=>n.date>=d28s&&n.date<d14s&&(n.water||0)>=waterTarget).length;
+  const nutRecent   = (d.nutrition||[]).filter(n=>n.date>=d14s).length;
+  const nutPrev     = (d.nutrition||[]).filter(n=>n.date>=d28s&&n.date<d14s).length;
+  if (nutRecent >= 5 && nutPrev >= 5) {
+    const rWaterPct = Math.round(waterRecent/nutRecent*100);
+    const pWaterPct = Math.round(waterPrev/nutPrev*100);
+    if (rWaterPct >= pWaterPct + 20)
+      insights.push({ priority:7, icon:'✓', type:'positive', text:`Hydration is improving — hitting your water goal on ${rWaterPct}% of days, up from ${pWaterPct}%.` });
+    else if (rWaterPct <= pWaterPct - 20 && pWaterPct >= 50)
+      insights.push({ priority:6, icon:'⚠', type:'warning', text:`Water goal completion has dropped from ${pWaterPct}% to ${rWaterPct}% recently.` });
+  }
+
+  // ── Streak highlight ──────────────────────────────────────
+  const str = getStreaks(pid);
+  const bestNow = Math.max(str.weighIn.current, str.workout.current, str.water.current);
+  const bestName = str.weighIn.current>=str.workout.current&&str.weighIn.current>=str.water.current
+    ? 'Weigh-In' : str.workout.current>=str.water.current ? 'Workout' : 'Water Goal';
+  const allTimeBest = Math.max(str.weighIn.best, str.workout.best, str.water.best);
+  if (bestNow >= 7 && bestNow >= allTimeBest * 0.9)
+    insights.push({ priority:9, icon:'✓', type:'positive', text:`You're ${bestNow===allTimeBest?'matching':'approaching'} your all-time best ${bestName.toLowerCase()} streak at ${bestNow} days.` });
+  else if (bestNow >= 14)
+    insights.push({ priority:7, icon:'✓', type:'positive', text:`${bestNow}-day ${bestName.toLowerCase()} streak is well above average — keep protecting it.` });
+
+  // ── Logging consistency ───────────────────────────────────
+  const recentLogging = sw.filter(w=>w.date>=d14s).length;
+  if (recentLogging >= 12)
+    insights.push({ priority:6, icon:'✓', type:'positive', text:`You've logged your weight ${recentLogging} times in the last 14 days — excellent data quality.` });
+  else if (sw.length >= 14 && recentLogging <= 4)
+    insights.push({ priority:6, icon:'⚠', type:'warning', text:`Weight logging has become infrequent recently — daily data gives the most reliable forecasts.` });
+
+  // Sort by priority, cap at 5
+  insights.sort((a,b)=>b.priority-a.priority);
+  return memoSet('trends', pid, insights.slice(0,5));
+}
+
+function renderDashboardTrends() {
+  const el = document.getElementById('dash-trends-content');
+  if (!el) return;
+  const insights = computeTrendInsights(currentProfile);
+  if (!insights.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Keep logging data — trends will appear here as your history builds.</div>';
+    return;
+  }
+  el.innerHTML = insights.map(ins => `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;flex-shrink:0;color:${ins.type==='positive'?'var(--accent3)':'var(--warning)'}">${ins.icon}</span>
+      <span style="font-size:12px;line-height:1.5;color:var(--text)">${ins.text}</span>
+    </div>`).join('').replace(/border-bottom[^;]+;([^"]*")([^<]*<\/div>\s*$)/, 'border-bottom:none;$1$2');
+}
+
+// ── 3. MONTHLY REVIEW ENGINE ──────────────────────────────
+// Mirrors the weekly review engine but operates on a calendar month.
+// Stored in monthly_reviews Supabase table + localStorage.
+function getMonthBounds(year, month) {
+  // month is 1-based
+  const start = new Date(year, month-1, 1).toISOString().slice(0,10);
+  const end   = new Date(year, month, 0).toISOString().slice(0,10); // last day of month
+  const label = new Date(year, month-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
+  return { start, end, label };
+}
+
+function generateMonthlyReview(pid, year, month) {
+  const d    = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d || !prof) return null;
+
+  const { start, end, label } = getMonthBounds(year, month);
+
+  const sw   = [...(d.weights||[])].filter(w=>w.date>=start&&w.date<=end).sort((a,b)=>a.date<b.date?-1:1);
+  const acts = (d.activities||[]).filter(a=>a.date>=start&&a.date<=end);
+  const nuts = (d.nutrition||[]).filter(n=>n.date>=start&&n.date<=end);
+  const waterTarget = (d.settings||{}).water_target || 3;
+  const waterDays   = nuts.filter(n=>(n.water||0)>=waterTarget).length;
+  const enabled     = (d.habitDefs||[]).filter(h=>h.enabled);
+
+  const startW      = sw.length ? sw[0].weight : null;
+  const endW        = sw.length ? sw[sw.length-1].weight : null;
+  const weightChange= (startW!=null&&endW!=null) ? +(endW-startW).toFixed(1) : null;
+  const workouts    = acts.length;
+
+  // Habit % across the month
+  let habitPct = 0;
+  if (enabled.length) {
+    const daysInMonth = new Date(year,month,0).getDate();
+    const allDays = [...Array(daysInMonth)].map((_,i)=>{
+      const dt=new Date(year,month-1,i+1); return dt.toISOString().slice(0,10);
+    });
+    const total = allDays.reduce((s,dk)=>{const dh=(d.habits||{})[dk]||{};return s+enabled.filter(h=>dh[h.id]).length;},0);
+    habitPct = Math.round(total/(enabled.length*daysInMonth)*100);
+  }
+
+  // Achievements earned this month
+  const monthAchs = (d.achievements||[]).filter(a=>a.earned_at>=start&&a.earned_at<=end);
+
+  // Streaks
+  const str = getStreaks(pid);
+  const bestStreakVal = Math.max(str.weighIn.best, str.workout.best, str.water.best);
+
+  // Goal-weighted scoring (same logic as weekly but monthly benchmarks)
+  const goalType    = prof.goalType || 'lose_weight';
+  const isWeightGoal= goalType==='lose_weight';
+  const isFitnessGoal=goalType==='improve_fitness'||goalType==='gain_muscle';
+  const isConsist   = goalType==='build_consistency';
+
+  const daysInMonth = new Date(year,month,0).getDate();
+  let score = 0;
+
+  // Weight (proportional)
+  if (weightChange !== null) {
+    const monthly = isWeightGoal ? 30 : 15;
+    if (weightChange < -2.0)      score += monthly;
+    else if (weightChange < -1.0) score += Math.round(monthly*0.85);
+    else if (weightChange < -0.3) score += Math.round(monthly*0.65);
+    else if (weightChange === 0)  score += Math.round(monthly*0.40);
+    else if (!isWeightGoal)       score += Math.round(monthly*0.30);
+  } else score += 5;
+
+  // Workouts (monthly benchmark: 12 for fitness, 8 for others)
+  const woBenchmark = isFitnessGoal ? 12 : 8;
+  const woWeight    = isFitnessGoal ? 35 : 25;
+  if (workouts >= woBenchmark+4) score += woWeight;
+  else if (workouts >= woBenchmark) score += Math.round(woWeight*0.85);
+  else if (workouts >= woBenchmark/2) score += Math.round(woWeight*0.55);
+  else if (workouts >= 2) score += Math.round(woWeight*0.25);
+
+  // Habits
+  const habW = isConsist ? 35 : 25;
+  if (habitPct >= 80) score += habW;
+  else if (habitPct >= 65) score += Math.round(habW*0.75);
+  else if (habitPct >= 50) score += Math.round(habW*0.50);
+  else if (!enabled.length) score += Math.round(habW*0.40);
+
+  // Hydration
+  const waterW = 10;
+  const nutTotal = nuts.length || 1;
+  const waterPct = Math.round(waterDays/nutTotal*100);
+  if (waterPct >= 80) score += waterW;
+  else if (waterPct >= 60) score += Math.round(waterW*0.70);
+  else if (waterPct >= 40) score += Math.round(waterW*0.40);
+
+  // Achievements bonus
+  if (monthAchs.length >= 2) score += 5;
+  else if (monthAchs.length >= 1) score += 2;
+
+  score = Math.min(100, score);
+  const stars    = score>=85?5:score>=68?4:score>=48?3:score>=28?2:1;
+  const category = stars>=5?'outstanding':stars>=4?'good':stars>=3?'mixed':'reset';
+
+  // Narrative (same structure: opener + win + middle + closer; ≤4 sentences, ≤80 words)
+  const vSeed = (year*12+month) % 5;
+
+  const catOpeners = {
+    outstanding:['This was one of your strongest months yet.','The data tells a clear story: this was an outstanding month.','An outstanding month — across the board.','This month delivered on every front.','Everything came together this month.'],
+    good:['Solid progress this month.','A positive month with real results.','Good momentum built this month.','A productive month — the effort is clear.','Strong foundations were reinforced this month.'],
+    mixed:['Progress was made this month, though consistency varied.','A mixed month with real highlights worth noting.','There were strong periods this month worth building on.','Some strong weeks, some lighter ones — a real mixed month.','Not a perfect month, but there was genuine progress.'],
+    reset:['A quieter month on the tracking front — and that\'s okay.','Every month is different, and lighter periods are part of the process.','A reset month — sometimes the body and mind need it.','Not every month runs to plan, and that\'s a normal part of the journey.','A lighter month, which sets up a stronger one ahead.'],
+  };
+  let narrative = catOpeners[category][vSeed % 5] + ' ';
+
+  // Biggest win
+  const wins = [];
+  if (weightChange !== null && weightChange < -2) wins.push(`losing ${Math.abs(weightChange)} kg`);
+  else if (weightChange !== null && weightChange < -0.5) wins.push(`dropping ${Math.abs(weightChange)} kg`);
+  if (workouts >= woBenchmark+4) wins.push(`completing ${workouts} workouts`);
+  else if (workouts >= woBenchmark) wins.push(`${workouts} workouts logged`);
+  if (habitPct >= 80) wins.push(`${habitPct}% habit consistency`);
+  if (monthAchs.length >= 2) wins.push(`${monthAchs.length} new achievements earned`);
+  const biggestWin = wins[0] || null;
+
+  if (biggestWin) narrative += `Your biggest win was ${biggestWin}. `;
+
+  // Supporting note
+  const support = [];
+  if (!biggestWin?.includes('workout') && workouts >= 8) support.push(`${workouts} workouts completed`);
+  if (!biggestWin?.includes('habit')   && habitPct >= 65) support.push(`${habitPct}% habit completion`);
+  if (!biggestWin?.includes('kg')      && weightChange !== null && weightChange < 0) support.push(`weight down ${Math.abs(weightChange)} kg`);
+  if (support.length) narrative += support[0].charAt(0).toUpperCase()+support[0].slice(1)+'. ';
+
+  // Closer
+  if (category === 'outstanding') {
+    narrative += ['Keep following what\'s working.','Maintain this approach — the results speak for themselves.','This is what sustained effort looks like.','Stay the course.','Trust the process — it\'s working.'][vSeed%5];
+  } else {
+    const opps = [];
+    if (workouts < woBenchmark/2) opps.push('increasing workout frequency');
+    if (habitPct < 50 && enabled.length) opps.push('rebuilding daily habits');
+    if (isWeightGoal && (!weightChange || weightChange >= 0)) opps.push('tightening up nutrition');
+    const opp = opps[0];
+    if (opp) narrative += `The biggest opportunity next month is ${opp}.`;
+    else narrative += ['Keep building on this momentum.','Good foundations — keep adding to them.','The direction is right. Stay consistent.','Progress compounds — keep showing up.','One month at a time.'][vSeed%5];
+  }
+
+  return {
+    monthStart: start, monthEnd: end, monthLabel: label,
+    stars, score, category,
+    weightChange, workouts, habitPct, waterDays,
+    narrative,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function getOrGenerateMonthlyReview(pid, year, month) {
+  const d = DB[pid];
+  if (!d) return null;
+  const { start } = getMonthBounds(year, month);
+
+  // If a review already exists (from Supabase sync or prior generation),
+  // return it immediately — monthly reviews are FROZEN once created.
+  // They are permanent snapshots of a closed period and never regenerate.
+  const existing = (d.monthlyReviews||[]).find(r => r.monthStart === start);
+  if (existing) return existing;
+
+  // Generation rules:
+  //   Current month  → generate freely (updated as the month progresses)
+  //   Past month     → generate exactly ONCE if missing, then freeze forever.
+  //                    This prevents historical gaps when a user returns after
+  //                    a long absence. The review is based on data logged
+  //                    during that month, which is already immutable.
+  //   Future month   → never generate
+  const now = new Date();
+  const nowYear  = now.getFullYear();
+  const nowMonth = now.getMonth() + 1; // 1-based
+  const isFuture = (year > nowYear) || (year === nowYear && month > nowMonth);
+  if (isFuture) return null;
+
+  const review = generateMonthlyReview(pid, year, month);
+  if (!review) return null;
+
+  d.monthlyReviews = [...(d.monthlyReviews||[]), review].sort((a,b)=>b.monthStart>a.monthStart?1:-1);
+  saveLocalCache(pid);
+
+  // Persist immediately — this is the only time this review will ever be written.
+  // Past-month reviews use INSERT (not upsert) to make the freeze explicit,
+  // but upsert with onConflict is safe and idempotent if called twice.
+  if (sb && isOnline) {
+    const row = {
+      id:           pid+'-'+start,
+      profile_id:   pid,
+      month_start:  start,
+      month_end:    review.monthEnd,
+      month_label:  review.monthLabel,
+      stars:        review.stars,
+      category:     review.category,
+      narrative:    review.narrative,
+      weight_change:review.weightChange,
+      workouts:     review.workouts,
+      habit_pct:    review.habitPct,
+      water_days:   review.waterDays,
+      generated_at: review.generatedAt,
+    };
+    sb.from('monthly_reviews').upsert(row, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.warn('[monthly_reviews] upsert:', error.message); });
+  }
+  return review;
+}
+
+function renderMonthlyReviews() {
+  const el = document.getElementById('monthly-review-content');
+  if (!el) return;
+
+  const now = new Date();
+
+  // Generate current month (after day 7 = enough data)
+  if (now.getDate() >= 7) {
+    getOrGenerateMonthlyReview(currentProfile, now.getFullYear(), now.getMonth()+1);
+  }
+
+  // Backfill up to 3 past months if no review exists for them.
+  // Each generates exactly once (frozen on first write), preventing
+  // permanent historical gaps when the user returns after an absence.
+  for (let i = 1; i <= 3; i++) {
+    const dt = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    getOrGenerateMonthlyReview(currentProfile, dt.getFullYear(), dt.getMonth()+1);
+  }
+
+  const reviews = [...(P().monthlyReviews||[])].sort((a,b)=>b.monthStart>a.monthStart?1:-1);
+
+  if (!reviews.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">No monthly reviews yet.\nLog data for at least a week to see your first monthly summary.</div></div>`;
+    return;
+  }
+
+  const catLabels = {outstanding:'Outstanding Month',good:'Good Month',mixed:'Mixed Month',reset:'Reset Month'};
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Monthly reviews are generated from your actual data. They refresh when you open this tab.</div>
+    ${reviews.map(r => `
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700">${r.monthLabel}</div>
+          <div style="font-size:20px;color:var(--warning);letter-spacing:1px;margin-top:2px">${starsHTML(r.stars)}</div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-top:1px">${catLabels[r.category]||''}</div>
+        </div>
+        <div style="text-align:right">
+          ${r.weightChange!==null?`<div style="font-size:15px;font-weight:700;color:${r.weightChange<0?'var(--accent3)':'var(--text)'}">${r.weightChange>0?'+':''}${r.weightChange} kg</div>`:''}
+          <div style="font-size:11px;color:var(--muted)">${r.workouts} workout${r.workouts!==1?'s':''}</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:8px">
+        <div><div class="stat-label">Habits</div><div style="font-weight:600">${r.habitPct}%</div></div>
+        <div><div class="stat-label">Water Days</div><div style="font-weight:600">${r.waterDays}</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;font-style:italic;border-top:1px solid var(--border);padding-top:8px">"${r.narrative}"</div>
+    </div>`).join('')}`;
+}
+
+// ── 4. BIGGEST WINS TIMELINE ──────────────────────────────
+// Combines achievements, streak records, and weight/workout milestones
+// into a chronological success history. Grouped by month.
+function buildWinsTimeline(pid) {
+  const d    = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d) return [];
+
+  const events = [];
+
+  // Outstanding monthly reviews (≥4 stars) — memorable milestones
+  (d.monthlyReviews||[])
+    .filter(r => r.stars >= 4)
+    .forEach(r => {
+      events.push({
+        date: r.monthStart,
+        icon: r.stars === 5 ? '🌟' : '⭐',
+        text: `${r.stars === 5 ? 'Outstanding' : 'Strong'} Month — ${r.monthLabel}`,
+        sub:  `${r.stars}★ Monthly Review`,
+        kind: 'review',
+      });
+    });
+
+  // Achievements (already earned, have earned_at dates)
+  (d.achievements||[]).forEach(a => {
+    events.push({ date: a.earned_at, icon: a.icon, text: a.name, sub: a.category, kind: 'achievement' });
+  });
+
+  // Weight milestones — every 5kg crossed in the log
+  const sw = [...(d.weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+  if (sw.length >= 2 && prof?.goalWeight) {
+    const startW = sw[0].weight;
+    const goalW  = prof.goalWeight;
+    const isLoss = goalW < startW;
+    for (let target = Math.floor(startW/5)*5; isLoss ? target >= goalW : target <= goalW; target += isLoss ? -5 : 5) {
+      if (isLoss ? target >= startW : target <= startW) continue;
+      const crossDate = sw.find(w => isLoss ? w.weight<=target : w.weight>=target);
+      if (crossDate) {
+        const isGoal = Math.abs(target - goalW) < 0.5;
+        events.push({
+          date: crossDate.date,
+          icon: isGoal ? '🏆' : '⚡',
+          text: `Reached ${target} kg`,
+          sub:  isGoal ? 'Goal Weight Reached' : 'Weight Milestone',
+          kind: isGoal ? 'goal' : 'milestone',
+        });
+      }
+    }
+  }
+
+  // Streak record moments — only when not already covered by an achievement
+  const str = getStreaks(pid);
+  const achIds = new Set((d.achievements||[]).map(a=>a.id));
+  if (str.workout.best >= 7 && !achIds.has('streak-7')) {
+    events.push({ date: todayStr(), icon:'🔥', text:`${str.workout.best}-Day Workout Streak`, sub:'Personal Record', kind: 'streak' });
+  }
+
+  // Remove duplicates by date+text
+  const seen = new Set();
+  const unique = events.filter(e => {
+    const key = e.date+'::'+e.text;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+
+  // Sort descending (newest first)
+  return unique.sort((a,b) => b.date > a.date ? 1 : -1);
+}
+
+function renderWinsTimeline() {
+  const el = document.getElementById('timeline-content');
+  if (!el) return;
+
+  const events = buildWinsTimeline(currentProfile);
+
+  if (!events.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Your journey timeline will appear here\nas you log progress and earn achievements.</div></div>`;
+    return;
+  }
+
+  // Group by YYYY-MM
+  const groups = {};
+  events.forEach(e => {
+    const key = e.date.slice(0,7); // YYYY-MM
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const groupKeys  = Object.keys(groups).sort((a,b)=>b>a?1:-1);
+
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Your personal success history, newest first.</div>
+    ${groupKeys.map(key => {
+      const [yr, mo] = key.split('-').map(Number);
+      const label = monthNames[mo-1] + ' ' + yr;
+      return `
+      <div style="margin-bottom:18px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">${label}</div>
+        ${groups[key].map(e=>`
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:24px;flex-shrink:0">${e.icon}</div>
+          <div>
+            <div style="font-size:14px;font-weight:600">${e.text}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">${e.sub} · ${fmtDate(e.date,'D MMM YYYY')}</div>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }).join('')}`;
+}
+
 function renderMore() {
   renderMilestones();
   if (currentMoreTab==='more-weekly')       renderWeeklySummary();
+  if (currentMoreTab==='more-monthly')      renderMonthlyReviews();
+  if (currentMoreTab==='more-timeline')     renderWinsTimeline();
   if (currentMoreTab==='more-insights')     renderInsights();
   if (currentMoreTab==='more-achievements') renderAchievements();
   if (currentMoreTab==='more-compare')      renderCompare();
@@ -3659,7 +4452,7 @@ async function deleteProfileFromSettings(pid) {
 
   try {
     if (sb && isOnline) {
-      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews','monthly_reviews'];
       for (const table of tables) {
         const { error } = await sb.from(table).delete().eq('profile_id', pid);
         if (error) console.warn(`[deleteProfile] ${table}:`, error.message);
@@ -3670,7 +4463,7 @@ async function deleteProfileFromSettings(pid) {
 
     delete PROFILES[pid];
     delete DB[pid];
-    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews'].forEach(t => {
+    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews','monthlyReviews'].forEach(t => {
       localStorage.removeItem(lsKey(pid, t));
     });
     lsSave('_app', 'profiles', Object.values(PROFILES));
