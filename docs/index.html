@@ -3561,27 +3561,50 @@ function computeGoalForecast(pid) {
     });
   }
 
-  // Rolling 30d rate
-  const w30 = sw.slice(-Math.min(sw.length,30));
-  let rate30 = null; // kg/day (negative = losing)
-  if (w30.length >= 7) {
+  // ── Rate calculation ──────────────────────────────────────
+  // Windows are defined by CALENDAR DATE RANGE, not entry count.
+  // Using sw.slice(-N) selects the N most-recent records regardless of
+  // how many calendar days they span — if a user logs 14 entries in 3 days,
+  // the "14-entry window" would be 3 days, producing an artificially steep rate.
+  // Instead we filter to entries that fall within a true date window.
+
+  const todayD = new Date(); todayD.setHours(0,0,0,0);
+  const cutoff30 = new Date(todayD); cutoff30.setDate(todayD.getDate()-30);
+  const cutoff14 = new Date(todayD); cutoff14.setDate(todayD.getDate()-14);
+  const cutoff7  = new Date(todayD); cutoff7.setDate(todayD.getDate()-7);
+  const cut30s = cutoff30.toISOString().slice(0,10);
+  const cut14s = cutoff14.toISOString().slice(0,10);
+
+  const w30 = sw.filter(w => w.date >= cut30s);
+  const w14 = sw.filter(w => w.date >= cut14s);
+
+  // Rate = (last - first) / calendar days spanned.
+  // Requires ≥2 entries in the window to produce a meaningful rate.
+  // Using endpoint-to-endpoint rather than regression to stay simple and auditable.
+  let rate30 = null;
+  if (w30.length >= 2) {
     const span = dateDiffDays(w30[0].date, w30[w30.length-1].date) || 1;
     rate30 = (w30[w30.length-1].weight - w30[0].weight) / span;
   }
 
-  // Rolling 14d rate
-  const w14 = sw.slice(-Math.min(sw.length,14));
   let rate14 = null;
-  if (w14.length >= 7) {
+  if (w14.length >= 2) {
     const span = dateDiffDays(w14[0].date, w14[w14.length-1].date) || 1;
     rate14 = (w14[w14.length-1].weight - w14[0].weight) / span;
   }
 
-  // Use 14d rate if recent, 30d for stability; blend if both exist
+  // Blend: 60% recent (14d), 40% longer-term (30d) when both exist.
+  // If only one window has data, use it alone.
   let currentRate = rate14 ?? rate30;
   if (rate14 !== null && rate30 !== null) {
-    currentRate = (rate14 * 0.6 + rate30 * 0.4); // weight recent data more
+    currentRate = rate14 * 0.6 + rate30 * 0.4;
   }
+
+  // Diagnostic fields — exposed in result for debugging
+  const _w30first = w30.length >= 2 ? w30[0] : null;
+  const _w30last  = w30.length >= 2 ? w30[w30.length-1] : null;
+  const _w14first = w14.length >= 2 ? w14[0] : null;
+  const _w14last  = w14.length >= 2 ? w14[w14.length-1] : null;
 
   const currentWeekly = currentRate !== null ? +(currentRate * 7).toFixed(2) : null;
 
@@ -3592,26 +3615,48 @@ function computeGoalForecast(pid) {
   // Estimate goal date at current pace
   let estimatedDate = null;
   let estimatedDateStr = null;
+  let daysToEstimated = null;  // days until goal weight is reached at current pace
   if (currentRate !== null && Math.abs(currentRate) > 0.005) {
     const daysToGoal = (goalWeight - lw) / currentRate;
     if (daysToGoal > 0 && daysToGoal < 3650) {
+      daysToEstimated = Math.round(daysToGoal);
       const ed = new Date();
-      ed.setDate(ed.getDate() + Math.round(daysToGoal));
+      ed.setDate(ed.getDate() + daysToEstimated);
       estimatedDate = ed;
       estimatedDateStr = ed.toISOString().slice(0,10);
     }
   }
 
-  // Status
+  // ── Short history safeguard ──────────────────────────────
+  // The first 10–14 days of any weight-loss program typically show a steep
+  // initial drop from water loss and glycogen depletion that does not reflect
+  // sustainable fat loss. Extrapolating a long-term goal date from this period
+  // produces misleading results regardless of how mathematically correct the
+  // arithmetic is.
+  //
+  // Rule: if the weight log spans fewer than 21 calendar days, suppress the
+  // estimated goal date and force confidence to 'low'. Current pace, required
+  // pace, and status are still shown — they're useful relative signals.
+  // Only the forward-projection (Est. Goal Date, ahead/behind) is hidden.
+  const trackingDays = sw.length >= 2
+    ? dateDiffDays(sw[0].date, sw[sw.length-1].date)
+    : 0;
+  const shortHistory = trackingDays < 21;
+
+  if (shortHistory) {
+    // Suppress the estimated goal date — it would be based on a misleading rate
+    estimatedDateStr  = null;
+    daysToEstimated   = null;
+  }
+
+  // Status — still meaningful even with short history (pace vs required pace)
   let status = 'unknown';
   if (currentRate !== null && requiredRate !== null) {
     if (isGain) {
-      // Gaining: current should be ≥ required
       if (currentRate >= requiredRate * 0.95)       status = 'ahead';
       else if (currentRate >= requiredRate * 0.70)  status = 'on-track';
       else                                           status = 'behind';
     } else {
-      // Losing: current (negative) should be ≤ required (negative)
       if (currentRate <= requiredRate * 0.95)       status = 'ahead';
       else if (currentRate <= requiredRate * 0.70)  status = 'on-track';
       else if (currentRate < 0)                     status = 'behind';
@@ -3648,7 +3693,12 @@ function computeGoalForecast(pid) {
   const confScore    = Math.round((dataScore + freshScore + stabScore) / 3);
 
   let confidence, confReason;
-  if (confScore >= 68) {
+  if (shortHistory) {
+    // Short history always overrides the score — regardless of logging frequency
+    // or volatility, a sub-21-day window cannot produce a trustworthy forecast.
+    confidence = 'low';
+    confReason = `Only ${trackingDays} day${trackingDays!==1?'s':''} of data — keep logging daily for a reliable forecast. Estimated goal date is hidden until 21+ days of history exist.`;
+  } else if (confScore >= 68) {
     confidence = 'high';
     confReason = 'Based on consistent daily logging with stable data.';
   } else if (confScore >= 40) {
@@ -3663,17 +3713,30 @@ function computeGoalForecast(pid) {
                  'High day-to-day variation makes projections unreliable.';
   }
 
+  // How many calendar days ahead of / behind the deadline the estimate is.
+  // Suppressed when shortHistory, since estimatedDateStr is also suppressed.
+  const daysAhead = (!shortHistory && daysToEstimated !== null && daysLeft > 0)
+    ? daysLeft - daysToEstimated
+    : null;
+
   const result = {
     status, currentWeekly, requiredWeekly,
-    estimatedDateStr, lw, goalWeight, daysLeft,
+    estimatedDateStr, daysToEstimated, daysAhead, daysLeft,
+    lw, goalWeight,
+    trackingDays, shortHistory,
     dataPoints: sw.length,
+    w14count: w14.length, w30count: w30.length,
+    rate14: rate14 !== null ? +(rate14*7).toFixed(2) : null,
+    rate30: rate30 !== null ? +(rate30*7).toFixed(2) : null,
+    _w14first, _w14last, _w30first, _w30last,
     confidence, confReason, confScore,
   };
   return memoSet('goalForecast', pid, result);
 }
 
 function renderDashboardForecast() {
-  const el = document.getElementById('dash-forecast-content');
+  const el   = document.getElementById('dash-forecast-content');
+  const prof = PROF();
   if (!el) return;
   const fc = computeGoalForecast(currentProfile);
   if (!fc) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Set a goal weight and date to see your forecast.</div>'; return; }
@@ -3706,6 +3769,21 @@ function renderDashboardForecast() {
   const s = statusMap[fc.status] || statusMap.unknown;
   const c = confMap[fc.confidence] || confMap.medium;
 
+  // Ahead/behind callout — the most useful derived insight
+  let aheadLine = '';
+  if (fc.daysAhead !== null) {
+    const absD = Math.abs(fc.daysAhead);
+    if (fc.daysAhead > 7) {
+      aheadLine = `<div style="font-size:12px;color:var(--accent3);font-weight:600;margin-top:8px">
+        At this pace you're projected to hit your goal <strong>${absD} days ahead</strong> of your target deadline.
+      </div>`;
+    } else if (fc.daysAhead < -7) {
+      aheadLine = `<div style="font-size:12px;color:var(--accent2);font-weight:600;margin-top:8px">
+        At this pace you're projected to finish <strong>${absD} days after</strong> your target deadline.
+      </div>`;
+    }
+  }
+
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -3717,21 +3795,22 @@ function renderDashboardForecast() {
     <div class="grid-2" style="margin-bottom:0">
       <div>
         <div class="stat-label">Current Pace</div>
-        <div style="font-size:18px;font-weight:700;color:${fc.currentWeekly<0?'var(--accent3)':fc.currentWeekly>0?'var(--accent2)':'var(--muted)'}">${fc.currentWeekly!==null?(fc.currentWeekly>0?'+':'')+fc.currentWeekly+' kg/wk':'—'}</div>
+        <div style="font-size:16px;font-weight:700;color:${fc.currentWeekly<0?'var(--accent3)':fc.currentWeekly>0?'var(--accent2)':'var(--muted)'}">${fc.currentWeekly!==null?(fc.currentWeekly>0?'+':'')+fc.currentWeekly+' kg/wk':'—'}</div>
       </div>
       <div>
         <div class="stat-label">Required Pace</div>
-        <div style="font-size:18px;font-weight:700">${fc.requiredWeekly!==null?(fc.requiredWeekly>0?'+':'')+fc.requiredWeekly+' kg/wk':'—'}</div>
+        <div style="font-size:16px;font-weight:700">${fc.requiredWeekly!==null?(fc.requiredWeekly>0?'+':'')+fc.requiredWeekly+' kg/wk':'—'}</div>
       </div>
       <div>
         <div class="stat-label">Est. Goal Date</div>
-        <div style="font-size:13px;font-weight:700">${fc.estimatedDateStr?fmtDate(fc.estimatedDateStr,'D MMM YYYY'):'—'}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--accent3)">${fc.estimatedDateStr?fmtDate(fc.estimatedDateStr,'D MMM YYYY'):'—'}</div>
       </div>
       <div>
-        <div class="stat-label">Days Remaining</div>
-        <div style="font-size:18px;font-weight:700;color:var(--accent)">${fc.daysLeft>0?fc.daysLeft:'—'}</div>
+        <div class="stat-label">Target Deadline</div>
+        <div style="font-size:13px;font-weight:700">${fc.daysLeft>0?fmtDate(prof.goalDate,'D MMM YYYY'):'—'}</div>
       </div>
     </div>
+    ${aheadLine}
     ${fc.confidence!=='high'?`<div style="font-size:11px;color:var(--muted);margin-top:8px;font-style:italic">${fc.confReason}</div>`:''}`;
 }
 
