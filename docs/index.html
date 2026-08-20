@@ -124,12 +124,6 @@
       <div id="dash-forecast-content"></div>
     </div>
 
-    <!-- Key Trends card -->
-    <div class="card" id="dash-trends-card" style="margin-bottom:10px">
-      <div class="card-title">💡 Key Trends</div>
-      <div id="dash-trends-content"></div>
-    </div>
-
     <!-- Projection card -->
     <div class="card" id="dash-proj-card">
       <div class="card-title">🎯 Goal Projection</div>
@@ -331,38 +325,48 @@
     <div id="habit-sections"></div>
   </div>
 
+  <!-- ══ REVIEWS ══ -->
   <!-- ══ MORE ══ -->
   <div class="page hidden" id="page-more">
     <div class="page-header"><div class="page-title">⋯ More</div></div>
-    <div class="tabs" id="more-tabs" style="overflow-x:auto">
-      <button class="tab active" data-mtab="more-milestones">🏆 Goals</button>
-      <button class="tab" data-mtab="more-weekly">📊 Week</button>
-      <button class="tab" data-mtab="more-monthly">📅 Month</button>
-      <button class="tab" data-mtab="more-timeline">⏳ Journey</button>
-      <button class="tab" data-mtab="more-insights">💡 Insights</button>
-      <button class="tab" data-mtab="more-achievements">🎖 Awards</button>
-      <button class="tab" data-mtab="more-compare">⚖ Compare</button>
-      <button class="tab" data-mtab="more-data">💾 Data</button>
+
+    <!-- Sticky nav: section pills + tab bar — stays at top of scroll viewport -->
+    <div id="more-sticky-nav" style="position:sticky;top:0;z-index:10;background:var(--bg);padding:4px 0 0;margin:0 -16px;padding-left:16px;padding-right:16px;border-bottom:1px solid var(--border);margin-bottom:10px">
+      <div id="more-section-label" class="section-label" style="margin-top:4px"></div>
+      <div class="tabs" id="more-tabs" style="overflow-x:auto;margin-bottom:0"></div>
     </div>
-    <div id="more-milestones"><div class="card"><div class="card-title">Milestones</div><div id="milestone-list"></div></div></div>
-    <div id="more-weekly"  class="hidden"><div id="weekly-summary-content"></div></div>
-    <div id="more-monthly" class="hidden"><div id="monthly-review-content"></div></div>
-    <div id="more-timeline" class="hidden"><div id="timeline-content"></div></div>
-    <div id="more-insights" class="hidden"><div id="insights-content"></div></div>
-    <div id="more-achievements" class="hidden"><div id="achievements-content"></div></div>
-    <div id="more-compare" class="hidden"><div id="compare-content"></div></div>
-    <div id="more-data" class="hidden">
+
+    <!-- Persistent tab content containers (hidden/shown by JS) -->
+    <!-- REVIEWS group -->
+    <div id="mct-weekly"   class="hidden"><div id="weekly-summary-content"></div></div>
+    <div id="mct-monthly"  class="hidden"><div id="monthly-review-content"></div></div>
+    <div id="mct-trends"   class="hidden"><div id="trends-page-content"></div></div>
+    <div id="mct-timeline" class="hidden"><div id="timeline-content"></div></div>
+    <!-- PROGRESS group -->
+    <div id="mct-milestones" class="hidden"><div class="card"><div class="card-title">Milestones</div><div id="milestone-list"></div></div></div>
+    <div id="mct-achievements" class="hidden"><div id="achievements-content"></div></div>
+    <div id="mct-compare"  class="hidden"><div id="compare-content"></div></div>
+    <!-- DATA & SETTINGS group -->
+    <div id="mct-data" class="hidden">
       <div class="card">
-        <div class="card-title">Export / Import</div>
+        <div class="card-title">Profile &amp; Goals</div>
+        <div id="more-profile-content"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Export</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <div class="section-label" style="margin:0">Current Profile</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Current Profile</div>
           <button class="btn btn-secondary" onclick="exportCurrentProfile()">📤 JSON — My Profile</button>
           <button class="btn btn-secondary" onclick="exportCurrentProfileCSV()">📊 CSV — My Profile</button>
-          <div class="section-label" style="margin:8px 0 0">All Profiles</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:6px;margin-bottom:2px">All Profiles</div>
           <button class="btn btn-secondary" onclick="exportAllProfiles()">📦 JSON — All Profiles</button>
           <button class="btn btn-secondary" onclick="exportAllProfilesCSV()">📊 CSV — All Profiles</button>
-          <button class="btn btn-secondary" onclick="importData()">📥 Import Backup (JSON)</button>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Import</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Restore from a previous JSON backup. Existing data is preserved.</div>
+        <button class="btn btn-secondary" onclick="importData()">📥 Import Backup (JSON)</button>
       </div>
       <div class="card">
         <div class="card-title">Data Summary</div>
@@ -724,7 +728,7 @@ let currentProfile = null;  // set after profiles load
 let currentPage    = 'dashboard';
 let currentActType = 'Cycling';
 let currentActTab  = 'act-log';
-let currentMoreTab = 'more-milestones';
+let currentMoreTab  = 'mct-weekly';  // active tab within the More page
 let habitViewDate  = todayStr();
 let syncTimer      = null;
 let offlineQueue   = [];
@@ -798,20 +802,8 @@ async function boot() {
       if (id==='act-stats') renderActivityStats();
     });
 
-    // Init more tabs
-    setupTabGroup('more-tabs', 'mtab', id => {
-      currentMoreTab = id;
-      ['more-milestones','more-weekly','more-monthly','more-timeline','more-insights','more-achievements','more-compare','more-data'].forEach(x =>
-        document.getElementById(x).classList.toggle('hidden', x!==id)
-      );
-      if (id==='more-weekly')       renderWeeklySummary();
-      if (id==='more-monthly')      renderMonthlyReviews();
-      if (id==='more-timeline')     renderWinsTimeline();
-      if (id==='more-insights')     renderInsights();
-      if (id==='more-achievements') renderAchievements();
-      if (id==='more-compare')      renderCompare();
-      if (id==='more-data')         renderDataSummary();
-    });
+    // Init More page — grouped tabs with section switcher
+    setupMorePage();
 
     // Migrate old single-profile localStorage data to first profile
     migrateOldData();
@@ -1930,9 +1922,8 @@ function renderDashboard() {
     renderWeightChart('chart-dash-weight', sw.slice(-30), true, null, prof.goalWeight);
   } else { chartCard.classList.add('hidden'); }
 
-  // New v1.2 dashboard cards
+  // v1.2 dashboard cards
   renderDashboardForecast();
-  renderDashboardTrends();
   renderDashboardStreaks();
   renderDashboardWeekSummary();
   renderDashboardRecentAchievement();
@@ -4335,15 +4326,178 @@ function renderWinsTimeline() {
     }).join('')}`;
 }
 
+// ══ MORE PAGE — grouped sections ════════════════════════
+//
+// Three sections, each with their own tab set:
+//   REVIEWS:          Weekly · Monthly · Trends · Journey
+//   PROGRESS:         Milestones · Achievements · Compare
+//   DATA & SETTINGS:  Profile & Data & Settings
+//
+// The page header shows the active section name.
+// Switching sections rebuilds the tab bar; switching tabs within
+// a section shows/hides only that group's content containers.
+
+const MORE_SECTIONS = {
+  reviews: {
+    label: '📊 Reviews',
+    tabs: [
+      { id:'mct-weekly',   label:'📊 This Week' },
+      { id:'mct-monthly',  label:'📅 Monthly'   },
+      { id:'mct-trends',   label:'💡 Trends'    },
+      { id:'mct-timeline', label:'⏳ Journey'   },
+    ],
+  },
+  progress: {
+    label: '🏆 Progress',
+    tabs: [
+      { id:'mct-milestones',    label:'🏆 Goals'   },
+      { id:'mct-achievements',  label:'🎖 Awards'  },
+      { id:'mct-compare',       label:'⚖ Compare' },
+    ],
+  },
+  data: {
+    label: '⚙ Data & Settings',
+    tabs: [
+      { id:'mct-data', label:'💾 Data' },
+    ],
+  },
+};
+
+// All content container IDs across all sections
+const MORE_ALL_TABS = ['mct-weekly','mct-monthly','mct-trends','mct-timeline',
+                       'mct-milestones','mct-achievements','mct-compare','mct-data'];
+
+let currentMoreSection = 'reviews'; // which group is active
+
+function setupMorePage() {
+  // Build section pill buttons (appear above the tab bar, inside the page)
+  const sectionBar = document.getElementById('more-section-label');
+  if (!sectionBar) return;
+
+  // Replace the plain section-label div with a pill row
+  sectionBar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px';
+  sectionBar.innerHTML = Object.entries(MORE_SECTIONS).map(([key, sec]) => `
+    <button id="more-sec-${key}" onclick="switchMoreSection('${key}')"
+      style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;
+             letter-spacing:.05em;text-transform:uppercase;border:none;cursor:pointer;
+             background:${key===currentMoreSection?'var(--accent)':'var(--card)'};
+             color:${key===currentMoreSection?'#fff':'var(--muted)'}">
+      ${sec.label}
+    </button>`).join('');
+
+  // Build the initial tab bar for the active section
+  rebuildMoreTabs(currentMoreSection);
+}
+
+function switchMoreSection(sectionKey) {
+  currentMoreSection = sectionKey;
+
+  // Update pill button styles
+  Object.keys(MORE_SECTIONS).forEach(k => {
+    const btn = document.getElementById('more-sec-'+k);
+    if (!btn) return;
+    btn.style.background = k===sectionKey ? 'var(--accent)' : 'var(--card)';
+    btn.style.color      = k===sectionKey ? '#fff' : 'var(--muted)';
+  });
+
+  // Switch to the first tab of this section
+  const firstTab = MORE_SECTIONS[sectionKey].tabs[0].id;
+  currentMoreTab = firstTab;
+  rebuildMoreTabs(sectionKey);
+  activateMoreTab(firstTab);
+}
+
+function rebuildMoreTabs(sectionKey) {
+  const bar = document.getElementById('more-tabs');
+  if (!bar) return;
+  const tabs = MORE_SECTIONS[sectionKey].tabs;
+
+  if (tabs.length <= 1) {
+    // Single-tab section: hide the tab bar, just show the content
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = '';
+  bar.innerHTML = tabs.map((t, i) => `
+    <button class="tab${i===0?' active':''}" onclick="activateMoreTab('${t.id}')"
+      data-mctab="${t.id}">${t.label}</button>`).join('');
+}
+
+function activateMoreTab(tabId) {
+  currentMoreTab = tabId;
+
+  // Update tab button styles within the current tab bar
+  const bar = document.getElementById('more-tabs');
+  if (bar) bar.querySelectorAll('.tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.mctab === tabId)
+  );
+
+  // Hide all content containers, show only the active one
+  MORE_ALL_TABS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', id !== tabId);
+  });
+
+  // Render the content for this tab
+  if (tabId==='mct-weekly')       renderWeeklySummary();
+  if (tabId==='mct-monthly')      renderMonthlyReviews();
+  if (tabId==='mct-trends')       renderTrendsPage();
+  if (tabId==='mct-timeline')     renderWinsTimeline();
+  if (tabId==='mct-milestones')   renderMilestones();
+  if (tabId==='mct-achievements') renderAchievements();
+  if (tabId==='mct-compare')      renderCompare();
+  if (tabId==='mct-data')         { renderMoreProfile(); renderDataSummary(); }
+}
+
 function renderMore() {
-  renderMilestones();
-  if (currentMoreTab==='more-weekly')       renderWeeklySummary();
-  if (currentMoreTab==='more-monthly')      renderMonthlyReviews();
-  if (currentMoreTab==='more-timeline')     renderWinsTimeline();
-  if (currentMoreTab==='more-insights')     renderInsights();
-  if (currentMoreTab==='more-achievements') renderAchievements();
-  if (currentMoreTab==='more-compare')      renderCompare();
-  if (currentMoreTab==='more-data')         renderDataSummary();
+  // Ensure the section bar + tab bar are built (idempotent after first call)
+  if (!document.getElementById('more-sec-reviews')) setupMorePage();
+  // Render the currently active tab
+  activateMoreTab(currentMoreTab);
+}
+
+// Trends rendered inside More → Reviews → Trends tab
+function renderTrendsPage() {
+  const el = document.getElementById('trends-page-content');
+  if (!el) return;
+  const insights = computeTrendInsights(currentProfile);
+  if (!insights.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💡</div><div class="empty-text">Keep logging data — trends will appear here as your history builds.</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Trends are calculated from your last 4–8 weeks of data and update as you log more.</div>
+    <div class="card">${insights.map(ins => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px;flex-shrink:0;color:${ins.type==='positive'?'var(--accent3)':'var(--warning)'}">${ins.icon}</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--text)">${ins.text}</span>
+      </div>`).join('')}
+    </div>`;
+}
+
+// Profile card in Data & Settings tab
+function renderMoreProfile() {
+  const el = document.getElementById('more-profile-content');
+  if (!el) return;
+  const prof = PROF();
+  const canDelete = Object.keys(PROFILES).length > 1;
+  el.innerHTML = `
+    <div class="habit-row">
+      <div>
+        <div class="habit-label">${prof.name}</div>
+        <div class="habit-time">Goal: ${prof.goalWeight ? prof.goalWeight+' kg' : '—'} · ${prof.goalDate ? fmtDate(prof.goalDate,'D MMM YYYY') : '—'}</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="openCreateProfileModal('${currentProfile}')">Edit</button>
+    </div>
+    <div class="habit-row" style="border-bottom:none">
+      <div>
+        <div class="habit-label" style="color:var(--accent2)">Delete Profile</div>
+        <div class="habit-time">Remove all data for ${prof.name}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteProfileFromSettings('${currentProfile}')" ${canDelete?'':'disabled'}>Delete</button>
+    </div>`;
 }
 
 function renderMilestones() {
@@ -4495,29 +4649,23 @@ function renderCompare() {
 }
 
 function renderDataSummary() {
-  document.getElementById('data-summary-grid').innerHTML = `
+  const el = document.getElementById('data-summary-grid');
+  if (el) el.innerHTML = `
     <div class="stat-tile"><div class="stat-label">Weight</div><div class="stat-val">${P().weights.length}</div></div>
     <div class="stat-tile"><div class="stat-label">Activity</div><div class="stat-val">${P().activities.length}</div></div>
     <div class="stat-tile"><div class="stat-label">Nutrition</div><div class="stat-val">${P().nutrition.length}</div></div>`;
 
+  const sc = document.getElementById('settings-content');
+  if (!sc) return;
   const s = P().settings;
-  const canDelete = Object.keys(PROFILES).length > 1;
-  document.getElementById('settings-content').innerHTML = `
+  sc.innerHTML = `
     <div class="habit-row">
       <div><div class="habit-label">Protein Target</div><div class="habit-time">${s.protein_target||150}g / day</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openModal_nutSettings()">Edit</button>
     </div>
-    <div class="habit-row">
+    <div class="habit-row" style="border-bottom:none">
       <div><div class="habit-label">Water Target</div><div class="habit-time">${s.water_target||3}L / day</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openModal_nutSettings()">Edit</button>
-    </div>
-    <div class="habit-row">
-      <div><div class="habit-label">Edit Profile</div><div class="habit-time">${PROF().name}</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="openCreateProfileModal('${currentProfile}')">Edit</button>
-    </div>
-    <div class="habit-row" style="border-bottom:none">
-      <div><div class="habit-label" style="color:var(--accent2)">Delete Profile</div><div class="habit-time">Remove ${PROF().name} and all data</div></div>
-      <button class="btn btn-danger btn-sm" onclick="deleteProfileFromSettings('${currentProfile}')" ${canDelete?'':'disabled'}>Delete</button>
     </div>`;
 }
 
