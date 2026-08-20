@@ -802,7 +802,9 @@ function ensureProfileDB(pid) {
 }
 
 function loadLocalCache() {
-  // Load all known profiles (from PROFILES + anything cached)
+  // Load all known profiles (from PROFILES + anything cached).
+  // habitDefs fallback is [] — never inject hardcoded habits.
+  // The DB is the only source of truth for habit definitions.
   const allPids = new Set([
     ...Object.keys(PROFILES),
     ...Object.keys(DB),
@@ -813,7 +815,7 @@ function loadLocalCache() {
     DB[pid].activities = lsLoad(pid,'activities', []);
     DB[pid].nutrition  = lsLoad(pid,'nutrition',  []);
     DB[pid].habits     = lsLoad(pid,'habits',     {});
-    DB[pid].habitDefs  = lsLoad(pid,'habitDefs',  defaultHabitDefs(pid));
+    DB[pid].habitDefs  = lsLoad(pid,'habitDefs',  []);   // ← empty, never seeded
     DB[pid].settings   = lsLoad(pid,'settings',   defaultSettings(pid));
   }
 }
@@ -908,8 +910,13 @@ async function loadProfileFromSupabase(pid) {
     if (!wRes.error  && wRes.data)  { DB[pid].weights    = wRes.data.map(r=>({...r})); }
     if (!aRes.error  && aRes.data)  { DB[pid].activities = aRes.data.map(r=>({...r})); }
     if (!nRes.error  && nRes.data)  { DB[pid].nutrition  = nRes.data.map(r=>({...r, meals: r.meals||{} })); }
-    if (!hdRes.error && hdRes.data && hdRes.data.length > 0) {
-      DB[pid].habitDefs = hdRes.data.map(r=>({...r}));
+    // habit_definitions: always overwrite from DB — even if empty.
+    // This removes stale seeded habits from cache when the user has
+    // deleted them all.
+    if (!hdRes.error && hdRes.data !== null) {
+      DB[pid].habitDefs = hdRes.data
+        .slice()
+        .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
     }
     // Rebuild habits map from habits table
     if (!hRes.error && hRes.data) {
@@ -1115,23 +1122,6 @@ function defaultSettings(pid) {
   return { protein_target: 150, water_target: 3.0 };
 }
 
-function defaultHabitDefs(pid) {
-  return [
-    { id:'hd-weigh',     name:'Weigh myself',            category:'Morning', time:'',        enabled:true,  sort_order:1,  profile_id:pid },
-    { id:'hd-jeera',     name:'Jeera water',             category:'Morning', time:'',        enabled:true,  sort_order:2,  profile_id:pid },
-    { id:'hd-almonds',   name:'Almonds + flax seeds',    category:'Morning', time:'',        enabled:true,  sort_order:3,  profile_id:pid },
-    { id:'hd-lunch',     name:'Lunch',                   category:'Meals',   time:'',        enabled:true,  sort_order:4,  profile_id:pid },
-    { id:'hd-whey',      name:'Whey protein',            category:'Meals',   time:'',        enabled:true,  sort_order:5,  profile_id:pid },
-    { id:'hd-dinner',    name:'Dinner',                  category:'Meals',   time:'',        enabled:true,  sort_order:6,  profile_id:pid },
-    { id:'hd-workout',   name:'Workout',                 category:'Workout', time:'',        enabled:true,  sort_order:7,  profile_id:pid },
-    { id:'hd-cycling',   name:'Cycling',                 category:'Workout', time:'',        enabled:true,  sort_order:8,  profile_id:pid },
-    { id:'hd-kettlebell',name:'Kettlebell',              category:'Workout', time:'',        enabled:true,  sort_order:9,  profile_id:pid },
-    { id:'hd-football',  name:'Football',                category:'Workout', time:'',        enabled:true,  sort_order:10, profile_id:pid },
-    { id:'hd-walk',      name:'Walking',                 category:'Workout', time:'',        enabled:true,  sort_order:11, profile_id:pid },
-    { id:'hd-cinnamon',  name:'Cinnamon water',          category:'Night',   time:'',        enabled:true,  sort_order:12, profile_id:pid },
-    { id:'hd-clothes',   name:'Prepare clothes/gear',    category:'Night',   time:'',        enabled:true,  sort_order:13, profile_id:pid },
-  ];
-}
 
 // ══ PROFILE MANAGEMENT ═══════════════════════════════════
 
@@ -1416,25 +1406,57 @@ async function saveProfile() {
 async function deleteCurrentProfile() {
   const editId = document.getElementById('cp-edit-id').value;
   if (!editId || !PROFILES[editId]) return;
-  if (Object.keys(PROFILES).length <= 1) { showToast('Cannot delete the only profile'); return; }
-  if (!confirm('Delete profile "'+PROFILES[editId].name+'"? All data will be removed.')) return;
-
-  delete PROFILES[editId];
-  delete DB[editId];
-  lsSave('_app','profiles', Object.values(PROFILES));
-
-  if (sb && isOnline) {
-    const { error } = await sb.from('profiles').delete().eq('id', editId);
-    if (error) console.warn('[deleteProfile] Supabase delete failed:', error.message);
+  if (Object.keys(PROFILES).length <= 1) {
+    showToast('Cannot delete the only profile');
+    return;
   }
 
-  currentProfile = Object.keys(PROFILES)[0];
-  localStorage.setItem('momentum_last_profile', currentProfile);
-  closeModal('modal-create-profile');
-  showToast('Profile deleted');
-  renderProfileSwitcher();
-  applyProfileAccent();
-  renderPage(currentPage);
+  const profName = PROFILES[editId].name;
+  if (!confirm(`Delete "${profName}" permanently?\n\nThis will remove ALL data:\n• Weights\n• Activities\n• Nutrition\n• Habits\n• Habit definitions\n• Settings\n\nThis cannot be undone.`)) return;
+
+  // Disable button during deletion
+  const delBtn = document.getElementById('cp-delete-btn');
+  if (delBtn) { delBtn.textContent = 'Deleting…'; delBtn.disabled = true; }
+
+  try {
+    // ── Delete all child data from Supabase (order matters for readability; no FK constraints) ──
+    if (sb && isOnline) {
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings'];
+      for (const table of tables) {
+        const { error } = await sb.from(table).delete().eq('profile_id', editId);
+        if (error) console.warn(`[deleteProfile] ${table} delete error:`, error.message);
+      }
+      // Delete the profile row itself
+      const { error: profErr } = await sb.from('profiles').delete().eq('id', editId);
+      if (profErr) console.warn('[deleteProfile] profiles delete error:', profErr.message);
+    }
+
+    // ── Remove from in-memory state ──
+    delete PROFILES[editId];
+    delete DB[editId];
+
+    // ── Remove from localStorage ──
+    ['weights','activities','nutrition','habits','habitDefs','settings'].forEach(t => {
+      localStorage.removeItem(lsKey(editId, t));
+    });
+    lsSave('_app', 'profiles', Object.values(PROFILES));
+
+    // ── Switch to first remaining profile ──
+    currentProfile = Object.keys(PROFILES)[0];
+    localStorage.setItem('momentum_last_profile', currentProfile);
+
+    closeModal('modal-create-profile');
+    showToast(`🗑 ${profName} deleted`);
+    renderProfileSwitcher();
+    applyProfileAccent();
+    renderPage(currentPage);
+
+  } catch(err) {
+    console.error('[deleteProfile] unexpected error:', err);
+    showToast('❌ Delete failed: ' + err.message);
+  } finally {
+    if (delBtn) { delBtn.textContent = 'Delete Profile'; delBtn.disabled = false; }
+  }
 }
 
 // ── Goal type select change: refresh habit recs ───────────
@@ -2272,10 +2294,24 @@ function renderHabits() {
   arc.style.stroke = pct>=80?'#6bffb8':'#7c6bff';
   setArc(arc, pct, 2*Math.PI*34);
 
-  // Group by category
+  // Group by category — always use the DB-ordered array, no sort here
+  // (sort_order comes from loadProfileFromSupabase already sorted)
   const byCat = {};
-  CAT_ORDER.forEach(c=>byCat[c]=[]);
-  P().habitDefs.forEach(h=>{ if(byCat[h.category]) byCat[h.category].push(h); });
+  CAT_ORDER.forEach(c => byCat[c] = []);
+  P().habitDefs.forEach(h => {
+    const key = CAT_ORDER.includes(h.category) ? h.category : 'Custom';
+    byCat[key].push(h);
+  });
+
+  const anyDefs = P().habitDefs.length > 0;
+  if (!anyDefs) {
+    document.getElementById('habit-sections').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        <div class="empty-text">No habits yet.\nTap <strong>+ Add</strong> to create your first habit.</div>
+      </div>`;
+    return;
+  }
 
   document.getElementById('habit-sections').innerHTML = CAT_ORDER.map(cat => {
     const defs = byCat[cat]; if (!defs.length) return '';
@@ -2283,16 +2319,18 @@ function renderHabits() {
       <div class="card-title">${CAT_ICONS[cat]||'☀️'} ${cat}</div>
       ${defs.map(h => {
         const isChecked = !!(P().habits[habitViewDate]||{})[h.id];
-        const timeStr   = h.time || 'Any time';
         return `<div class="habit-row">
           <div style="flex:1">
-            <div class="habit-label" style="color:${h.enabled?'var(--text)':'var(--muted)'}">${h.name}</div>
-            <div class="habit-time">${timeStr}</div>
+            <div class="habit-label" style="color:${h.enabled?'var(--text)':'var(--muted)'}">${h.name}${!h.enabled?'<span style="font-size:10px;color:var(--muted);margin-left:6px">(off)</span>':''}</div>
+            <div class="habit-time">${h.time||'Any time'}</div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="toggleHabitEnabled('${h.id}')" title="${h.enabled?'Disable':'Enable'}" style="font-size:11px;color:${h.enabled?'var(--accent3)':'var(--muted)'};background:none;border:1px solid ${h.enabled?'var(--accent3)':'var(--border)'};border-radius:6px;padding:2px 6px;cursor:pointer">${h.enabled?'ON':'OFF'}</button>
             <button onclick="editHabit('${h.id}')" style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer">✏️</button>
             <button onclick="deleteHabitDef('${h.id}')" style="font-size:12px;color:var(--accent2);background:none;border:none;cursor:pointer">✕</button>
-            ${h.enabled ? `<button class="check-btn${isChecked?' checked':''}" onclick="toggleHabit('${h.id}')">${isChecked?'✓':''}</button>` : `<span style="font-size:11px;color:var(--muted)">off</span>`}
+            ${h.enabled
+              ? `<button class="check-btn${isChecked?' checked':''}" onclick="toggleHabit('${h.id}')">${isChecked?'✓':''}</button>`
+              : `<span style="width:28px"></span>`}
           </div>
         </div>`;
       }).join('')}
@@ -2332,32 +2370,52 @@ async function saveHabitDef() {
   const editId = document.getElementById('edit-habit-id').value;
   const name   = document.getElementById('ah-name').value.trim();
   if (!name) { showToast('Enter a habit name'); return; }
-  const cat    = document.getElementById('ah-category').value;
-  const time   = document.getElementById('ah-time').value;
+  const cat  = document.getElementById('ah-category').value;
+  const time = document.getElementById('ah-time').value;
 
+  let changedHabit;
   if (editId) {
-    const idx = P().habitDefs.findIndex(h=>h.id===editId);
-    if (idx>=0) P().habitDefs[idx] = {...P().habitDefs[idx], name, category:cat, time};
+    const idx = P().habitDefs.findIndex(h => h.id === editId);
+    if (idx >= 0) {
+      P().habitDefs[idx] = { ...P().habitDefs[idx], name, category: cat, time };
+      changedHabit = P().habitDefs[idx];
+    }
   } else {
-    const newH = { id:'hd-custom-'+Date.now(), name, category:cat, time, enabled:true, sort_order:P().habitDefs.length+1, profile_id:currentProfile };
-    P().habitDefs.push(newH);
+    const maxOrder = P().habitDefs.reduce((m,h) => Math.max(m, h.sort_order||0), 0);
+    changedHabit = {
+      id:         'hd-' + currentProfile + '-' + Date.now(),
+      name, category: cat, time,
+      enabled:    true,
+      sort_order: maxOrder + 1,
+      profile_id: currentProfile,
+    };
+    P().habitDefs.push(changedHabit);
   }
   saveLocalCache(currentProfile);
 
-  // Sync all habit_definitions for this profile
-  for (const hd of P().habitDefs) {
-    await pushToSupabase('habit_definitions', hd, currentProfile);
+  // Only push the one changed record — not all definitions
+  if (changedHabit) {
+    await pushToSupabase('habit_definitions', changedHabit, currentProfile);
   }
 
-  document.getElementById('edit-habit-id').value  = '';
+  document.getElementById('edit-habit-id').value = '';
   document.getElementById('add-habit-title').textContent = 'Add Habit';
   closeModal('modal-add-habit');
   showToast('✅ Habit saved');
   renderHabits();
 }
 
+async function toggleHabitEnabled(id) {
+  const idx = P().habitDefs.findIndex(h => h.id === id);
+  if (idx < 0) return;
+  P().habitDefs[idx] = { ...P().habitDefs[idx], enabled: !P().habitDefs[idx].enabled };
+  saveLocalCache(currentProfile);
+  await pushToSupabase('habit_definitions', P().habitDefs[idx], currentProfile);
+  renderHabits();
+}
+
 async function deleteHabitDef(id) {
-  P().habitDefs = P().habitDefs.filter(h=>h.id!==id);
+  P().habitDefs = P().habitDefs.filter(h => h.id !== id);
   saveLocalCache(currentProfile);
   renderHabits();
   await deleteFromSupabase('habit_definitions', id, currentProfile);
@@ -2526,6 +2584,7 @@ function renderDataSummary() {
     <div class="stat-tile"><div class="stat-label">Nutrition</div><div class="stat-val">${P().nutrition.length}</div></div>`;
 
   const s = P().settings;
+  const canDelete = Object.keys(PROFILES).length > 1;
   document.getElementById('settings-content').innerHTML = `
     <div class="habit-row">
       <div><div class="habit-label">Protein Target</div><div class="habit-time">${s.protein_target||150}g / day</div></div>
@@ -2535,10 +2594,52 @@ function renderDataSummary() {
       <div><div class="habit-label">Water Target</div><div class="habit-time">${s.water_target||3}L / day</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openModal_nutSettings()">Edit</button>
     </div>
-    <div class="habit-row" style="border-bottom:none">
+    <div class="habit-row">
       <div><div class="habit-label">Edit Profile</div><div class="habit-time">${PROF().name}</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openCreateProfileModal('${currentProfile}')">Edit</button>
+    </div>
+    <div class="habit-row" style="border-bottom:none">
+      <div><div class="habit-label" style="color:var(--accent2)">Delete Profile</div><div class="habit-time">Remove ${PROF().name} and all data</div></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteProfileFromSettings('${currentProfile}')" ${canDelete?'':'disabled'}>Delete</button>
     </div>`;
+}
+
+// Called from the Settings tab — no modal needed
+async function deleteProfileFromSettings(pid) {
+  if (!PROFILES[pid]) return;
+  if (Object.keys(PROFILES).length <= 1) { showToast('Cannot delete the only profile'); return; }
+
+  const profName = PROFILES[pid].name;
+  if (!confirm(`Delete "${profName}" permanently?\n\nThis will remove ALL data:\n• Weights\n• Activities\n• Nutrition\n• Habits\n• Habit definitions\n• Settings\n\nThis cannot be undone.`)) return;
+
+  try {
+    if (sb && isOnline) {
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings'];
+      for (const table of tables) {
+        const { error } = await sb.from(table).delete().eq('profile_id', pid);
+        if (error) console.warn(`[deleteProfile] ${table}:`, error.message);
+      }
+      const { error: profErr } = await sb.from('profiles').delete().eq('id', pid);
+      if (profErr) console.warn('[deleteProfile] profiles:', profErr.message);
+    }
+
+    delete PROFILES[pid];
+    delete DB[pid];
+    ['weights','activities','nutrition','habits','habitDefs','settings'].forEach(t => {
+      localStorage.removeItem(lsKey(pid, t));
+    });
+    lsSave('_app', 'profiles', Object.values(PROFILES));
+
+    currentProfile = Object.keys(PROFILES)[0];
+    localStorage.setItem('momentum_last_profile', currentProfile);
+    showToast(`🗑 ${profName} deleted`);
+    renderProfileSwitcher();
+    applyProfileAccent();
+    renderPage(currentPage);
+  } catch(err) {
+    console.error('[deleteProfileFromSettings]', err);
+    showToast('❌ Delete failed: ' + err.message);
+  }
 }
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════
