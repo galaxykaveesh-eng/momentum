@@ -124,6 +124,24 @@
       <div class="trend-msg" style="margin-bottom:0" id="dash-proj-msg">Calculating…</div>
     </div>
 
+    <!-- Current Streaks -->
+    <div class="card" id="dash-streaks-card">
+      <div class="card-title">🔥 Current Streaks</div>
+      <div id="dash-streaks-content"></div>
+    </div>
+
+    <!-- This Week Summary -->
+    <div class="card" id="dash-week-card">
+      <div class="card-title">📊 This Week</div>
+      <div id="dash-week-content"></div>
+    </div>
+
+    <!-- Recent Achievement -->
+    <div class="card hidden" id="dash-achievement-card">
+      <div class="card-title">🎖 Latest Achievement</div>
+      <div id="dash-achievement-content"></div>
+    </div>
+
     <!-- Latest Activity -->
     <div class="card" id="dash-latest-act-card" style="display:none">
       <div class="card-title">Latest Activity</div>
@@ -304,22 +322,30 @@
   <!-- ══ MORE ══ -->
   <div class="page hidden" id="page-more">
     <div class="page-header"><div class="page-title">⋯ More</div></div>
-    <div class="tabs" id="more-tabs">
+    <div class="tabs" id="more-tabs" style="overflow-x:auto">
       <button class="tab active" data-mtab="more-milestones">🏆 Goals</button>
       <button class="tab" data-mtab="more-weekly">📊 Week</button>
+      <button class="tab" data-mtab="more-insights">💡 Insights</button>
+      <button class="tab" data-mtab="more-achievements">🎖 Awards</button>
       <button class="tab" data-mtab="more-compare">⚖ Compare</button>
       <button class="tab" data-mtab="more-data">💾 Data</button>
     </div>
     <div id="more-milestones"><div class="card"><div class="card-title">Milestones</div><div id="milestone-list"></div></div></div>
     <div id="more-weekly" class="hidden"><div id="weekly-summary-content"></div></div>
+    <div id="more-insights" class="hidden"><div id="insights-content"></div></div>
+    <div id="more-achievements" class="hidden"><div id="achievements-content"></div></div>
     <div id="more-compare" class="hidden"><div id="compare-content"></div></div>
     <div id="more-data" class="hidden">
       <div class="card">
         <div class="card-title">Export / Import</div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn-secondary" onclick="exportCurrentProfile()">📤 Export My Profile (JSON)</button>
-          <button class="btn btn-secondary" onclick="exportAllProfiles()">📦 Export Both Profiles (JSON)</button>
-          <button class="btn btn-secondary" onclick="importData()">📥 Import Backup</button>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="section-label" style="margin:0">Current Profile</div>
+          <button class="btn btn-secondary" onclick="exportCurrentProfile()">📤 JSON — My Profile</button>
+          <button class="btn btn-secondary" onclick="exportCurrentProfileCSV()">📊 CSV — My Profile</button>
+          <div class="section-label" style="margin:8px 0 0">All Profiles</div>
+          <button class="btn btn-secondary" onclick="exportAllProfiles()">📦 JSON — All Profiles</button>
+          <button class="btn btn-secondary" onclick="exportAllProfilesCSV()">📊 CSV — All Profiles</button>
+          <button class="btn btn-secondary" onclick="importData()">📥 Import Backup (JSON)</button>
         </div>
       </div>
       <div class="card">
@@ -692,10 +718,17 @@ let selectedProfileColor = '#7c6bff';  // for create-profile modal
 let selectedHabitRecs    = new Set();  // habit recs chosen in create modal
 
 // Per-profile data — keyed by profile id, created dynamically
-const DB = {};  // { [pid]: { weights, activities, nutrition, habits, habitDefs, settings } }
+const DB = {};  // { [pid]: { weights, activities, nutrition, habits, habitDefs, settings, achievements, reviews } }
 
 // ── Charts map ────────────────────────────────────────────
 const charts = {};
+
+// ── Memoisation cache (cleared on profile switch / data change) ──
+const _memo = {};
+function memoKey(fn, pid) { return fn+'::'+pid; }
+function memoGet(fn, pid) { return _memo[memoKey(fn,pid)]; }
+function memoSet(fn, pid, val) { _memo[memoKey(fn,pid)] = val; return val; }
+function memoClear(pid) { Object.keys(_memo).forEach(k=>{ if(k.endsWith('::'+pid)) delete _memo[k]; }); }
 
 // ══ BOOT ═════════════════════════════════════════════════
 async function boot() {
@@ -751,10 +784,14 @@ async function boot() {
     // Init more tabs
     setupTabGroup('more-tabs', 'mtab', id => {
       currentMoreTab = id;
-      ['more-milestones','more-weekly','more-compare','more-data'].forEach(x => document.getElementById(x).classList.toggle('hidden', x!==id));
-      if (id==='more-weekly')    renderWeeklySummary();
-      if (id==='more-compare')   renderCompare();
-      if (id==='more-data')      renderDataSummary();
+      ['more-milestones','more-weekly','more-insights','more-achievements','more-compare','more-data'].forEach(x =>
+        document.getElementById(x).classList.toggle('hidden', x!==id)
+      );
+      if (id==='more-weekly')      renderWeeklySummary();
+      if (id==='more-insights')    renderInsights();
+      if (id==='more-achievements') renderAchievements();
+      if (id==='more-compare')     renderCompare();
+      if (id==='more-data')        renderDataSummary();
     });
 
     // Migrate old single-profile localStorage data to first profile
@@ -797,36 +834,36 @@ function lsSave(profile, table, val) {
 
 function ensureProfileDB(pid) {
   if (!DB[pid]) {
-    DB[pid] = { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{} };
+    DB[pid] = { weights:[], activities:[], nutrition:[], habits:{}, habitDefs:[], settings:{}, achievements:[], reviews:[] };
   }
 }
 
 function loadLocalCache() {
-  // Load all known profiles (from PROFILES + anything cached)
-  const allPids = new Set([
-    ...Object.keys(PROFILES),
-    ...Object.keys(DB),
-  ]);
+  const allPids = new Set([...Object.keys(PROFILES), ...Object.keys(DB)]);
   for (const pid of allPids) {
     ensureProfileDB(pid);
-    DB[pid].weights    = lsLoad(pid,'weights',   []);
-    DB[pid].activities = lsLoad(pid,'activities', []);
-    DB[pid].nutrition  = lsLoad(pid,'nutrition',  []);
-    DB[pid].habits     = lsLoad(pid,'habits',     {});
-    DB[pid].habitDefs  = lsLoad(pid,'habitDefs',  defaultHabitDefs(pid));
-    DB[pid].settings   = lsLoad(pid,'settings',   defaultSettings(pid));
+    DB[pid].weights      = lsLoad(pid,'weights',   []);
+    DB[pid].activities   = lsLoad(pid,'activities', []);
+    DB[pid].nutrition    = lsLoad(pid,'nutrition',  []);
+    DB[pid].habits       = lsLoad(pid,'habits',     {});
+    DB[pid].habitDefs    = lsLoad(pid,'habitDefs',  []);
+    DB[pid].settings     = lsLoad(pid,'settings',   defaultSettings(pid));
+    DB[pid].achievements = lsLoad(pid,'achievements',[]);
+    DB[pid].reviews      = lsLoad(pid,'reviews',    []);
   }
 }
 
 function saveLocalCache(profile) {
   const d = DB[profile];
   if (!d) return;
-  lsSave(profile,'weights',   d.weights);
-  lsSave(profile,'activities',d.activities);
-  lsSave(profile,'nutrition', d.nutrition);
-  lsSave(profile,'habits',    d.habits);
-  lsSave(profile,'habitDefs', d.habitDefs);
-  lsSave(profile,'settings',  d.settings);
+  lsSave(profile,'weights',      d.weights);
+  lsSave(profile,'activities',   d.activities);
+  lsSave(profile,'nutrition',    d.nutrition);
+  lsSave(profile,'habits',       d.habits);
+  lsSave(profile,'habitDefs',    d.habitDefs);
+  lsSave(profile,'settings',     d.settings);
+  lsSave(profile,'achievements', d.achievements);
+  lsSave(profile,'reviews',      d.reviews);
 }
 
 // ══ SUPABASE SYNC ════════════════════════════════════════
@@ -896,20 +933,25 @@ async function loadAllFromSupabase() {
 async function loadProfileFromSupabase(pid) {
   if (!sb || !isOnline) return;
   try {
-    const [wRes, aRes, nRes, hRes, hdRes, sRes] = await Promise.all([
+    const [wRes, aRes, nRes, hRes, hdRes, sRes, achRes, revRes] = await Promise.all([
       sb.from('weights').select('*').eq('profile_id', pid).order('date'),
       sb.from('activities').select('*').eq('profile_id', pid).order('date'),
       sb.from('nutrition').select('*').eq('profile_id', pid).order('date'),
       sb.from('habits').select('*').eq('profile_id', pid),
       sb.from('habit_definitions').select('*').eq('profile_id', pid).order('sort_order'),
       sb.from('settings').select('*').eq('profile_id', pid).maybeSingle(),
+      sb.from('achievements').select('*').eq('profile_id', pid).order('earned_at'),
+      sb.from('weekly_reviews').select('*').eq('profile_id', pid).order('week_start', { ascending:false }),
     ]);
 
     if (!wRes.error  && wRes.data)  { DB[pid].weights    = wRes.data.map(r=>({...r})); }
     if (!aRes.error  && aRes.data)  { DB[pid].activities = aRes.data.map(r=>({...r})); }
     if (!nRes.error  && nRes.data)  { DB[pid].nutrition  = nRes.data.map(r=>({...r, meals: r.meals||{} })); }
-    if (!hdRes.error && hdRes.data && hdRes.data.length > 0) {
-      DB[pid].habitDefs = hdRes.data.map(r=>({...r}));
+    // habit_definitions: always overwrite from DB — even if empty.
+    if (!hdRes.error && hdRes.data !== null) {
+      DB[pid].habitDefs = hdRes.data
+        .slice()
+        .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
     }
     // Rebuild habits map from habits table
     if (!hRes.error && hRes.data) {
@@ -920,7 +962,35 @@ async function loadProfileFromSupabase(pid) {
     if (!sRes.error && sRes.data) {
       DB[pid].settings = { ...defaultSettings(pid), ...sRes.data.data };
     }
+    // Achievements — ignore error if table doesn't exist yet
+    if (!achRes.error && achRes.data) {
+      DB[pid].achievements = achRes.data.map(r=>({...r}));
+    }
 
+    // Weekly reviews — merge remote rows into local format, remote wins for same week
+    if (!revRes.error && revRes.data && revRes.data.length > 0) {
+      const remoteMap = {};
+      revRes.data.forEach(r => {
+        remoteMap[r.week_start] = {
+          weekStart:     r.week_start,
+          weekEnd:       r.week_end,
+          stars:         r.stars,
+          narrative:     r.narrative,
+          weightChange:  r.weight_change,
+          workouts:      r.workouts,
+          habitPct:      r.habit_pct,
+          waterDays:     r.water_days,
+          generatedAt:   r.generated_at,
+        };
+      });
+      // Merge: remote overwrites local for same week, keep local-only reviews
+      const localMap = {};
+      (DB[pid].reviews||[]).forEach(r => { localMap[r.weekStart] = r; });
+      DB[pid].reviews = Object.values({ ...localMap, ...remoteMap })
+        .sort((a,b) => b.weekStart > a.weekStart ? 1 : -1);
+    }
+
+    memoClear(pid);
     saveLocalCache(pid);
   } catch(e) {
     console.warn('Supabase load error for', pid, e);
@@ -1115,23 +1185,6 @@ function defaultSettings(pid) {
   return { protein_target: 150, water_target: 3.0 };
 }
 
-function defaultHabitDefs(pid) {
-  return [
-    { id:'hd-weigh',     name:'Weigh myself',            category:'Morning', time:'',        enabled:true,  sort_order:1,  profile_id:pid },
-    { id:'hd-jeera',     name:'Jeera water',             category:'Morning', time:'',        enabled:true,  sort_order:2,  profile_id:pid },
-    { id:'hd-almonds',   name:'Almonds + flax seeds',    category:'Morning', time:'',        enabled:true,  sort_order:3,  profile_id:pid },
-    { id:'hd-lunch',     name:'Lunch',                   category:'Meals',   time:'',        enabled:true,  sort_order:4,  profile_id:pid },
-    { id:'hd-whey',      name:'Whey protein',            category:'Meals',   time:'',        enabled:true,  sort_order:5,  profile_id:pid },
-    { id:'hd-dinner',    name:'Dinner',                  category:'Meals',   time:'',        enabled:true,  sort_order:6,  profile_id:pid },
-    { id:'hd-workout',   name:'Workout',                 category:'Workout', time:'',        enabled:true,  sort_order:7,  profile_id:pid },
-    { id:'hd-cycling',   name:'Cycling',                 category:'Workout', time:'',        enabled:true,  sort_order:8,  profile_id:pid },
-    { id:'hd-kettlebell',name:'Kettlebell',              category:'Workout', time:'',        enabled:true,  sort_order:9,  profile_id:pid },
-    { id:'hd-football',  name:'Football',                category:'Workout', time:'',        enabled:true,  sort_order:10, profile_id:pid },
-    { id:'hd-walk',      name:'Walking',                 category:'Workout', time:'',        enabled:true,  sort_order:11, profile_id:pid },
-    { id:'hd-cinnamon',  name:'Cinnamon water',          category:'Night',   time:'',        enabled:true,  sort_order:12, profile_id:pid },
-    { id:'hd-clothes',   name:'Prepare clothes/gear',    category:'Night',   time:'',        enabled:true,  sort_order:13, profile_id:pid },
-  ];
-}
 
 // ══ PROFILE MANAGEMENT ═══════════════════════════════════
 
@@ -1194,6 +1247,7 @@ function switchProfile(pid) {
   if (!PROFILES[pid]) return;
   currentProfile = pid;
   habitViewDate  = todayStr();
+  memoClear(pid);
   localStorage.setItem('momentum_last_profile', pid);
   renderProfileSwitcher();
   applyProfileAccent();
@@ -1416,25 +1470,54 @@ async function saveProfile() {
 async function deleteCurrentProfile() {
   const editId = document.getElementById('cp-edit-id').value;
   if (!editId || !PROFILES[editId]) return;
-  if (Object.keys(PROFILES).length <= 1) { showToast('Cannot delete the only profile'); return; }
-  if (!confirm('Delete profile "'+PROFILES[editId].name+'"? All data will be removed.')) return;
-
-  delete PROFILES[editId];
-  delete DB[editId];
-  lsSave('_app','profiles', Object.values(PROFILES));
-
-  if (sb && isOnline) {
-    const { error } = await sb.from('profiles').delete().eq('id', editId);
-    if (error) console.warn('[deleteProfile] Supabase delete failed:', error.message);
+  if (Object.keys(PROFILES).length <= 1) {
+    showToast('Cannot delete the only profile');
+    return;
   }
 
-  currentProfile = Object.keys(PROFILES)[0];
-  localStorage.setItem('momentum_last_profile', currentProfile);
-  closeModal('modal-create-profile');
-  showToast('Profile deleted');
-  renderProfileSwitcher();
-  applyProfileAccent();
-  renderPage(currentPage);
+  const profName = PROFILES[editId].name;
+  if (!confirm(`Delete "${profName}" permanently?\n\nThis will remove ALL data:\n• Weights\n• Activities\n• Nutrition\n• Habits\n• Habit definitions\n• Settings\n• Achievements\n\nThis cannot be undone.`)) return;
+
+  // Disable button during deletion
+  const delBtn = document.getElementById('cp-delete-btn');
+  if (delBtn) { delBtn.textContent = 'Deleting…'; delBtn.disabled = true; }
+
+  try {
+    // ── Delete all child data from Supabase ──
+    if (sb && isOnline) {
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      }
+      // Delete the profile row itself
+      const { error: profErr } = await sb.from('profiles').delete().eq('id', editId);
+      if (profErr) console.warn('[deleteProfile] profiles delete error:', profErr.message);
+    }
+
+    // ── Remove from in-memory state ──
+    delete PROFILES[editId];
+    delete DB[editId];
+
+    // ── Remove from localStorage ──
+    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews'].forEach(t => {
+      localStorage.removeItem(lsKey(editId, t));
+    });
+    lsSave('_app', 'profiles', Object.values(PROFILES));
+
+    // ── Switch to first remaining profile ──
+    currentProfile = Object.keys(PROFILES)[0];
+    localStorage.setItem('momentum_last_profile', currentProfile);
+
+    closeModal('modal-create-profile');
+    showToast(`🗑 ${profName} deleted`);
+    renderProfileSwitcher();
+    applyProfileAccent();
+    renderPage(currentPage);
+
+  } catch(err) {
+    console.error('[deleteProfile] unexpected error:', err);
+    showToast('❌ Delete failed: ' + err.message);
+  } finally {
+    if (delBtn) { delBtn.textContent = 'Delete Profile'; delBtn.disabled = false; }
+  }
 }
 
 // ── Goal type select change: refresh habit recs ───────────
@@ -1793,6 +1876,11 @@ function renderDashboard() {
     chartCard.classList.remove('hidden');
     renderWeightChart('chart-dash-weight', sw.slice(-30), true, null, prof.goalWeight);
   } else { chartCard.classList.add('hidden'); }
+
+  // New cards (non-blocking, run after main render)
+  renderDashboardStreaks();
+  renderDashboardWeekSummary();
+  renderDashboardRecentAchievement();
 }
 
 // ══ WEIGHT ══════════════════════════════════════════════
@@ -1910,12 +1998,14 @@ async function saveWeight() {
   };
   P().weights = P().weights.filter(w=>w.date!==date);
   P().weights.push(entry);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   closeModal('modal-weight');
   ['wf-weight','wf-bf','wf-waist'].forEach(id=>document.getElementById(id).value='');
   showToast('✅ Weight saved');
   renderPage(currentPage);
   await pushToSupabase('weights', entry, currentProfile);
+  await checkAndGrantAchievements(currentProfile);
 }
 
 async function deleteWeight(id) {
@@ -2043,6 +2133,7 @@ async function saveActivity() {
     notes:      document.getElementById('af-notes').value || null,
   };
   P().activities.push(entry);
+  memoClear(currentProfile);
   saveLocalCache(currentProfile);
   closeModal('modal-activity');
   ['af-name','af-duration','af-calories','af-distance','af-notes'].forEach(id => {
@@ -2051,6 +2142,7 @@ async function saveActivity() {
   showToast('✅ Activity saved');
   renderPage(currentPage);
   await pushToSupabase('activities', entry, currentProfile);
+  await checkAndGrantAchievements(currentProfile);
 }
 
 async function deleteActivity(id) {
@@ -2272,10 +2364,24 @@ function renderHabits() {
   arc.style.stroke = pct>=80?'#6bffb8':'#7c6bff';
   setArc(arc, pct, 2*Math.PI*34);
 
-  // Group by category
+  // Group by category — always use the DB-ordered array, no sort here
+  // (sort_order comes from loadProfileFromSupabase already sorted)
   const byCat = {};
-  CAT_ORDER.forEach(c=>byCat[c]=[]);
-  P().habitDefs.forEach(h=>{ if(byCat[h.category]) byCat[h.category].push(h); });
+  CAT_ORDER.forEach(c => byCat[c] = []);
+  P().habitDefs.forEach(h => {
+    const key = CAT_ORDER.includes(h.category) ? h.category : 'Custom';
+    byCat[key].push(h);
+  });
+
+  const anyDefs = P().habitDefs.length > 0;
+  if (!anyDefs) {
+    document.getElementById('habit-sections').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        <div class="empty-text">No habits yet.\nTap <strong>+ Add</strong> to create your first habit.</div>
+      </div>`;
+    return;
+  }
 
   document.getElementById('habit-sections').innerHTML = CAT_ORDER.map(cat => {
     const defs = byCat[cat]; if (!defs.length) return '';
@@ -2283,16 +2389,18 @@ function renderHabits() {
       <div class="card-title">${CAT_ICONS[cat]||'☀️'} ${cat}</div>
       ${defs.map(h => {
         const isChecked = !!(P().habits[habitViewDate]||{})[h.id];
-        const timeStr   = h.time || 'Any time';
         return `<div class="habit-row">
           <div style="flex:1">
-            <div class="habit-label" style="color:${h.enabled?'var(--text)':'var(--muted)'}">${h.name}</div>
-            <div class="habit-time">${timeStr}</div>
+            <div class="habit-label" style="color:${h.enabled?'var(--text)':'var(--muted)'}">${h.name}${!h.enabled?'<span style="font-size:10px;color:var(--muted);margin-left:6px">(off)</span>':''}</div>
+            <div class="habit-time">${h.time||'Any time'}</div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="toggleHabitEnabled('${h.id}')" title="${h.enabled?'Disable':'Enable'}" style="font-size:11px;color:${h.enabled?'var(--accent3)':'var(--muted)'};background:none;border:1px solid ${h.enabled?'var(--accent3)':'var(--border)'};border-radius:6px;padding:2px 6px;cursor:pointer">${h.enabled?'ON':'OFF'}</button>
             <button onclick="editHabit('${h.id}')" style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer">✏️</button>
             <button onclick="deleteHabitDef('${h.id}')" style="font-size:12px;color:var(--accent2);background:none;border:none;cursor:pointer">✕</button>
-            ${h.enabled ? `<button class="check-btn${isChecked?' checked':''}" onclick="toggleHabit('${h.id}')">${isChecked?'✓':''}</button>` : `<span style="font-size:11px;color:var(--muted)">off</span>`}
+            ${h.enabled
+              ? `<button class="check-btn${isChecked?' checked':''}" onclick="toggleHabit('${h.id}')">${isChecked?'✓':''}</button>`
+              : `<span style="width:28px"></span>`}
           </div>
         </div>`;
       }).join('')}
@@ -2332,46 +2440,670 @@ async function saveHabitDef() {
   const editId = document.getElementById('edit-habit-id').value;
   const name   = document.getElementById('ah-name').value.trim();
   if (!name) { showToast('Enter a habit name'); return; }
-  const cat    = document.getElementById('ah-category').value;
-  const time   = document.getElementById('ah-time').value;
+  const cat  = document.getElementById('ah-category').value;
+  const time = document.getElementById('ah-time').value;
 
+  let changedHabit;
   if (editId) {
-    const idx = P().habitDefs.findIndex(h=>h.id===editId);
-    if (idx>=0) P().habitDefs[idx] = {...P().habitDefs[idx], name, category:cat, time};
+    const idx = P().habitDefs.findIndex(h => h.id === editId);
+    if (idx >= 0) {
+      P().habitDefs[idx] = { ...P().habitDefs[idx], name, category: cat, time };
+      changedHabit = P().habitDefs[idx];
+    }
   } else {
-    const newH = { id:'hd-custom-'+Date.now(), name, category:cat, time, enabled:true, sort_order:P().habitDefs.length+1, profile_id:currentProfile };
-    P().habitDefs.push(newH);
+    const maxOrder = P().habitDefs.reduce((m,h) => Math.max(m, h.sort_order||0), 0);
+    changedHabit = {
+      id:         'hd-' + currentProfile + '-' + Date.now(),
+      name, category: cat, time,
+      enabled:    true,
+      sort_order: maxOrder + 1,
+      profile_id: currentProfile,
+    };
+    P().habitDefs.push(changedHabit);
   }
   saveLocalCache(currentProfile);
 
-  // Sync all habit_definitions for this profile
-  for (const hd of P().habitDefs) {
-    await pushToSupabase('habit_definitions', hd, currentProfile);
+  // Only push the one changed record — not all definitions
+  if (changedHabit) {
+    await pushToSupabase('habit_definitions', changedHabit, currentProfile);
   }
 
-  document.getElementById('edit-habit-id').value  = '';
+  document.getElementById('edit-habit-id').value = '';
   document.getElementById('add-habit-title').textContent = 'Add Habit';
   closeModal('modal-add-habit');
   showToast('✅ Habit saved');
   renderHabits();
 }
 
+async function toggleHabitEnabled(id) {
+  const idx = P().habitDefs.findIndex(h => h.id === id);
+  if (idx < 0) return;
+  P().habitDefs[idx] = { ...P().habitDefs[idx], enabled: !P().habitDefs[idx].enabled };
+  saveLocalCache(currentProfile);
+  await pushToSupabase('habit_definitions', P().habitDefs[idx], currentProfile);
+  renderHabits();
+}
+
 async function deleteHabitDef(id) {
-  P().habitDefs = P().habitDefs.filter(h=>h.id!==id);
+  P().habitDefs = P().habitDefs.filter(h => h.id !== id);
   saveLocalCache(currentProfile);
   renderHabits();
   await deleteFromSupabase('habit_definitions', id, currentProfile);
 }
 
-// ══ MORE PAGE ═══════════════════════════════════════════
-function renderMore() {
-  renderMilestones();
-  if (currentMoreTab==='more-weekly')  renderWeeklySummary();
-  if (currentMoreTab==='more-compare') renderCompare();
-  if (currentMoreTab==='more-data')    renderDataSummary();
+// ══ STREAK ENGINE ════════════════════════════════════════
+// Computes current and best streak for three high-value signals:
+//  • weighIn  — a weight entry exists on that date
+//  • workout  — an activity exists on that date
+//  • water    — nutrition.water >= water_target on that date
+//
+// Also supports per-habit custom streak tracking when
+// habit_definition has track_streak = true.
+//
+// Algorithm: walk backwards day-by-day from yesterday.
+// Current streak = consecutive days where condition was met.
+// Best streak = longest consecutive run over all history.
+
+function computeStreak(checkFn, pid) {
+  const cacheKey = 'streak_'+checkFn.name;
+  const cached = memoGet(cacheKey, pid);
+  if (cached) return cached;
+
+  const d = DB[pid];
+  if (!d) return memoSet(cacheKey, pid, { current:0, best:0 });
+
+  // Collect all dates with data — walk back up to 365 days
+  let current = 0; let best = 0; let run = 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Current streak: count backwards from yesterday
+  for (let i = 1; i <= 365; i++) {
+    const dt = new Date(today); dt.setDate(today.getDate() - i);
+    const dk = dt.toISOString().slice(0,10);
+    if (checkFn(d, dk)) {
+      current++;
+    } else break;
+  }
+  // Check today too (counts if already done today)
+  const todayDk = today.toISOString().slice(0,10);
+  if (checkFn(d, todayDk)) current++;
+
+  // Best streak: scan all dates in chronological order
+  // Find min and max dates with any relevant data
+  let allDates = new Set();
+  (d.weights||[]).forEach(w => allDates.add(w.date));
+  (d.activities||[]).forEach(a => allDates.add(a.date));
+  (d.nutrition||[]).forEach(n => allDates.add(n.date));
+  Object.keys(d.habits||{}).forEach(dk => allDates.add(dk));
+
+  const sorted = [...allDates].sort();
+  if (sorted.length) {
+    const startD = new Date(sorted[0]);
+    const endD   = new Date(); endD.setHours(0,0,0,0);
+    run = 0; best = current; // best is at least current
+    for (let dt = new Date(startD); dt <= endD; dt.setDate(dt.getDate()+1)) {
+      const dk = dt.toISOString().slice(0,10);
+      if (checkFn(d, dk)) { run++; if (run > best) best = run; }
+      else run = 0;
+    }
+  }
+
+  return memoSet(cacheKey, pid, { current, best });
 }
 
-function renderMilestones() {
+// Check functions for the three built-in streaks
+function _checkWeighIn(d, dk)  { return (d.weights||[]).some(w => w.date === dk); }
+function _checkWorkout(d, dk)  { return (d.activities||[]).some(a => a.date === dk); }
+function _checkWater(d, dk) {
+  const target = (d.settings||{}).water_target || 3;
+  const n = (d.nutrition||[]).find(n => n.date === dk);
+  return n ? (n.water||0) >= target : false;
+}
+
+function getStreaks(pid) {
+  return {
+    weighIn: computeStreak(_checkWeighIn, pid),
+    workout: computeStreak(_checkWorkout, pid),
+    water:   computeStreak(_checkWater,   pid),
+  };
+}
+
+// ══ ACHIEVEMENT ENGINE ═══════════════════════════════════
+// Achievements are computed from data, checked against
+// already-earned list to prevent duplicates, then stored.
+//
+// Schema per achievement:
+//   id          — slug, e.g. 'weight-1kg-lost'
+//   profile_id  — profile
+//   name        — display name
+//   category    — weight | workout | streak | water | habit
+//   icon        — emoji
+//   earned_at   — ISO date string
+
+const ACHIEVEMENT_DEFS = [
+  // Weight loss
+  { id:'weight-1kg',   name:'First 1 kg Lost',   cat:'Weight',  icon:'🥉', check:(d,sw,str)=>sw.length>=2 && (sw[0].weight-sw[sw.length-1].weight)>=1   },
+  { id:'weight-5kg',   name:'5 kg Lost',          cat:'Weight',  icon:'🥈', check:(d,sw,str)=>sw.length>=2 && (sw[0].weight-sw[sw.length-1].weight)>=5   },
+  { id:'weight-10kg',  name:'10 kg Lost',         cat:'Weight',  icon:'🥇', check:(d,sw,str)=>sw.length>=2 && (sw[0].weight-sw[sw.length-1].weight)>=10  },
+  { id:'weight-15kg',  name:'15 kg Lost',         cat:'Weight',  icon:'🏆', check:(d,sw,str)=>sw.length>=2 && (sw[0].weight-sw[sw.length-1].weight)>=15  },
+  // Logging consistency
+  { id:'log-7d',       name:'7 Days Logged',      cat:'Habit',   icon:'📅', check:(d,sw)=>sw.length>=7  },
+  { id:'log-14d',      name:'14 Days Logged',     cat:'Habit',   icon:'📅', check:(d,sw)=>sw.length>=14 },
+  { id:'log-30d',      name:'30 Days Logged',     cat:'Habit',   icon:'📅', check:(d,sw)=>sw.length>=30 },
+  // Workouts
+  { id:'workout-10',   name:'10 Workouts',        cat:'Workout', icon:'💪', check:(d)=>(d.activities||[]).length>=10  },
+  { id:'workout-25',   name:'25 Workouts',        cat:'Workout', icon:'💪', check:(d)=>(d.activities||[]).length>=25  },
+  { id:'workout-50',   name:'50 Workouts',        cat:'Workout', icon:'🏋️', check:(d)=>(d.activities||[]).length>=50  },
+  { id:'workout-100',  name:'100 Workouts',       cat:'Workout', icon:'🔱', check:(d)=>(d.activities||[]).length>=100 },
+  // Streaks
+  { id:'streak-7',     name:'7-Day Streak',       cat:'Streak',  icon:'🔥', check:(d,sw,str)=>str.weighIn.best>=7  || str.workout.best>=7  || str.water.best>=7  },
+  { id:'streak-30',    name:'30-Day Streak',      cat:'Streak',  icon:'🔥', check:(d,sw,str)=>str.weighIn.best>=30 || str.workout.best>=30 || str.water.best>=30 },
+  { id:'streak-100',   name:'100-Day Streak',     cat:'Streak',  icon:'⚡', check:(d,sw,str)=>str.weighIn.best>=100|| str.workout.best>=100|| str.water.best>=100 },
+  // Water goal
+  { id:'water-30',     name:'30 Water Goal Days', cat:'Water',   icon:'💧', check:(d,sw,str)=>str.water.best>=30 },
+  { id:'water-100',    name:'100 Water Goal Days',cat:'Water',   icon:'💧', check:(d,sw,str)=>str.water.best>=100 },
+  // Habit completions (total habit-day completions across all habits)
+  { id:'habit-30',     name:'30 Habit Completions',  cat:'Habit', icon:'✅', check:(d)=>totalHabitCompletions(d)>=30  },
+  { id:'habit-100',    name:'100 Habit Completions', cat:'Habit', icon:'✅', check:(d)=>totalHabitCompletions(d)>=100 },
+];
+
+function totalHabitCompletions(d) {
+  return Object.values(d.habits||{}).reduce((s, dayMap) =>
+    s + Object.values(dayMap).filter(Boolean).length, 0);
+}
+
+async function checkAndGrantAchievements(pid) {
+  const d   = DB[pid];
+  if (!d) return;
+  const sw  = [...(d.weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+  const str = getStreaks(pid);
+  const earned = new Set((d.achievements||[]).map(a=>a.id));
+  const newOnes = [];
+
+  for (const def of ACHIEVEMENT_DEFS) {
+    if (earned.has(def.id)) continue;
+    try {
+      if (def.check(d, sw, str)) {
+        const ach = {
+          id:         def.id,
+          profile_id: pid,
+          name:       def.name,
+          category:   def.cat,
+          icon:       def.icon,
+          earned_at:  todayStr(),
+        };
+        newOnes.push(ach);
+        earned.add(def.id);
+      }
+    } catch(e) { /* skip malformed check */ }
+  }
+
+  if (newOnes.length) {
+    d.achievements = [...(d.achievements||[]), ...newOnes];
+    saveLocalCache(pid);
+    // Persist to Supabase
+    if (sb && isOnline) {
+      for (const ach of newOnes) {
+        const { error } = await sb.from('achievements').upsert(ach, { onConflict: 'id,profile_id' });
+        if (error) console.warn('[achievements] upsert error:', error.message);
+      }
+    }
+    // Toast for each new achievement
+    newOnes.forEach(a => showToast(`${a.icon} Achievement unlocked: ${a.name}`));
+  }
+}
+
+// ══ WEEKLY REVIEW ENGINE ═════════════════════════════════
+// Rules-based text generation. No external AI.
+// Called on demand when the Insights tab is opened.
+// Reviews are stored in DB[pid].reviews and localStorage.
+// One review is generated per calendar week (Mon-Sun).
+// If a review for the current week already exists, it is shown
+// without regeneration. Re-generation can be triggered manually.
+
+function getWeekBounds(offsetWeeks) {
+  // Returns { start, end } as 'YYYY-MM-DD' strings
+  // offsetWeeks = 0 → current week (Mon–Sun), -1 → last week, etc.
+  const now = new Date(); now.setHours(0,0,0,0);
+  const dow = (now.getDay() + 6) % 7; // 0=Mon
+  const mon = new Date(now); mon.setDate(now.getDate() - dow + offsetWeeks*7);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return {
+    start: mon.toISOString().slice(0,10),
+    end:   sun.toISOString().slice(0,10),
+  };
+}
+
+function generateWeeklyReview(pid, weekStart, weekEnd) {
+  const d   = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d || !prof) return null;
+
+  const sw  = [...(d.weights||[])].filter(w=>w.date>=weekStart&&w.date<=weekEnd).sort((a,b)=>a.date<b.date?-1:1);
+  const acts = (d.activities||[]).filter(a=>a.date>=weekStart&&a.date<=weekEnd);
+  const nuts = (d.nutrition||[]).filter(n=>n.date>=weekStart&&n.date<=weekEnd);
+  const waterTarget = (d.settings||{}).water_target || 3;
+  const waterDays = nuts.filter(n=>(n.water||0)>=waterTarget).length;
+  const enabled = (d.habitDefs||[]).filter(h=>h.enabled);
+
+  // Weight metrics
+  const startW = sw.length ? sw[0].weight : null;
+  const endW   = sw.length ? sw[sw.length-1].weight : null;
+  const weightChange = (startW&&endW) ? +(endW-startW).toFixed(1) : null;
+
+  // Workout count
+  const workouts = acts.length;
+
+  // Habit completion %
+  let habitPct = 0;
+  const days7 = [];
+  for (let i=0;i<7;i++) {
+    const dt=new Date(weekStart); dt.setDate(dt.getDate()+i);
+    days7.push(dt.toISOString().slice(0,10));
+  }
+  if (enabled.length) {
+    const total = days7.reduce((s,dk)=>{
+      const dh=(d.habits||{})[dk]||{};
+      return s+enabled.filter(h=>dh[h.id]).length;
+    }, 0);
+    habitPct = Math.round(total/(enabled.length*7)*100);
+  }
+
+  // Nutrition tracking days
+  const nutDays = nuts.length;
+
+  // Best streak this week
+  const str = getStreaks(pid);
+  const bestStreakName = str.weighIn.current>=str.workout.current&&str.weighIn.current>=str.water.current
+    ? 'Weigh-In' : str.workout.current>=str.water.current ? 'Workout' : 'Water Goal';
+  const bestStreakVal  = Math.max(str.weighIn.current, str.workout.current, str.water.current);
+
+  // Score the week (0-100 scale for rating 1-5 stars)
+  let score = 0;
+  if (weightChange !== null && weightChange < 0) score += 25;
+  else if (weightChange !== null && weightChange === 0) score += 10;
+  if (workouts >= 4) score += 25;
+  else if (workouts >= 2) score += 15;
+  else if (workouts >= 1) score += 5;
+  if (habitPct >= 80) score += 25;
+  else if (habitPct >= 50) score += 15;
+  if (waterDays >= 6) score += 15;
+  else if (waterDays >= 4) score += 8;
+  if (sw.length >= 5) score += 10; // consistency bonus
+
+  const stars = score>=85?5:score>=65?4:score>=45?3:score>=25?2:1;
+
+  // Generate rules-based narrative
+  let narrative = '';
+  const isExcellent = stars >= 5;
+  const isStrong    = stars >= 4;
+  const isAverage   = stars === 3;
+
+  // Opening sentence
+  if (isExcellent) {
+    narrative = 'This was one of your best weeks. ';
+  } else if (isStrong) {
+    narrative = 'This was a strong week. ';
+  } else if (isAverage) {
+    narrative = 'This week showed moderate consistency. ';
+  } else {
+    narrative = 'This week had room for improvement. ';
+  }
+
+  // Weight
+  if (weightChange !== null) {
+    if (weightChange < -0.3) narrative += `Your weight trended down by ${Math.abs(weightChange)} kg. `;
+    else if (weightChange < 0) narrative += `Your weight dipped slightly by ${Math.abs(weightChange)} kg. `;
+    else if (weightChange === 0) narrative += 'Your weight remained stable. ';
+    else narrative += `Weight was up ${weightChange} kg — this can be normal fluctuation. `;
+  } else {
+    narrative += 'No weight data was logged this week. ';
+  }
+
+  // Workouts
+  if (workouts >= 5) narrative += `You completed ${workouts} workouts — excellent activity. `;
+  else if (workouts >= 3) narrative += `You completed ${workouts} workouts this week. `;
+  else if (workouts >= 1) narrative += `You had ${workouts} workout session${workouts>1?'s':''}. `;
+  else narrative += 'No workouts were recorded this week. ';
+
+  // Hydration
+  if (waterDays >= 6) narrative += 'Hydration was excellent. ';
+  else if (waterDays >= 4) narrative += `Water goal was hit on ${waterDays} of 7 days. `;
+  else if (waterDays > 0) narrative += `Hydration was inconsistent (${waterDays}/7 days). `;
+
+  // Habits
+  if (habitPct >= 80) narrative += `Habit completion was strong at ${habitPct}%. `;
+  else if (habitPct >= 50) narrative += `Habit completion was ${habitPct}%. `;
+  else if (enabled.length) narrative += `Habit completion was ${habitPct}% — focus on rebuilding routine. `;
+
+  // Closing advice
+  const weakPoints = [];
+  if (workouts < 2) weakPoints.push('activity');
+  if (waterDays < 4) weakPoints.push('hydration');
+  if (habitPct < 50) weakPoints.push('habit consistency');
+  if (sw.length < 4) weakPoints.push('daily weigh-ins');
+
+  if (isExcellent) {
+    narrative += 'Keep following the same routine.';
+  } else if (weakPoints.length) {
+    narrative += `Focus next week on improving ${weakPoints.slice(0,2).join(' and ')}.`;
+  } else {
+    narrative += 'Keep building on this momentum.';
+  }
+
+  return {
+    weekStart, weekEnd,
+    stars, score,
+    weightChange, workouts, habitPct, waterDays, nutDays,
+    bestStreakName, bestStreakVal,
+    startW, endW,
+    narrative,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function getOrGenerateReview(pid, weekStart, weekEnd) {
+  const d = DB[pid];
+  if (!d) return null;
+  const existing = (d.reviews||[]).find(r => r.weekStart === weekStart);
+  if (existing) return existing;
+
+  const review = generateWeeklyReview(pid, weekStart, weekEnd);
+  if (!review) return null;
+  d.reviews = [...(d.reviews||[]), review].sort((a,b)=>b.weekStart>a.weekStart?1:-1);
+  saveLocalCache(pid);
+
+  // Persist to Supabase so the review syncs across devices
+  if (sb && isOnline) {
+    const row = {
+      id:          pid + '-' + weekStart,
+      profile_id:  pid,
+      week_start:  weekStart,
+      week_end:    weekEnd,
+      stars:       review.stars,
+      narrative:   review.narrative,
+      weight_change: review.weightChange,
+      workouts:    review.workouts,
+      habit_pct:   review.habitPct,
+      water_days:  review.waterDays,
+      generated_at: review.generatedAt,
+    };
+    sb.from('weekly_reviews').upsert(row, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.warn('[weekly_reviews] upsert:', error.message); });
+  }
+
+  return review;
+}
+
+function starsHTML(n) {
+  return '★'.repeat(n) + '☆'.repeat(5-n);
+}
+
+// ══ DASHBOARD ADDITIONS ══════════════════════════════════
+
+function renderDashboardStreaks() {
+  const pid = currentProfile;
+  const str = getStreaks(pid);
+  const el  = document.getElementById('dash-streaks-content');
+  if (!el) return;
+
+  const items = [
+    { label:'Weigh-In',  emoji:'⚖️', ...str.weighIn },
+    { label:'Workout',   emoji:'🏋️', ...str.workout  },
+    { label:'Water Goal',emoji:'💧', ...str.water    },
+  ];
+
+  el.innerHTML = items.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:600">${s.emoji} ${s.label}</div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:800;color:${s.current>0?'var(--accent)':'var(--muted)'}">
+          ${s.current > 0 ? '🔥 '+s.current+'d' : '—'}
+        </div>
+        <div style="font-size:10px;color:var(--muted)">Best: ${s.best>0?s.best+'d':'—'}</div>
+      </div>
+    </div>`).join('').replace(/border-bottom[^}]+}\s*$/, 'border-bottom:none');
+}
+
+function renderDashboardWeekSummary() {
+  const el = document.getElementById('dash-week-content');
+  if (!el) return;
+  const { start, end } = getWeekBounds(0);
+  const review = getOrGenerateReview(currentProfile, start, end);
+  if (!review) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Log some data this week to see your summary.</div>'; return; }
+
+  el.innerHTML = `
+    <div style="font-size:20px;color:var(--warning);letter-spacing:2px;margin-bottom:6px">${starsHTML(review.stars)}</div>
+    <div class="grid-2" style="margin-bottom:8px">
+      <div><div class="stat-label">Weight</div><div style="font-weight:700;color:${(review.weightChange||0)<0?'var(--accent3)':'var(--text)'}">${review.weightChange!==null?(review.weightChange>0?'+':'')+review.weightChange+' kg':'—'}</div></div>
+      <div><div class="stat-label">Workouts</div><div style="font-weight:700">${review.workouts}</div></div>
+      <div><div class="stat-label">Habits</div><div style="font-weight:700">${review.habitPct}%</div></div>
+      <div><div class="stat-label">Water Days</div><div style="font-weight:700">${review.waterDays}/7</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;font-style:italic">"${review.narrative}"</div>`;
+}
+
+function renderDashboardRecentAchievement() {
+  const achs = (P().achievements||[]).slice().sort((a,b)=>b.earned_at>a.earned_at?1:-1);
+  const card = document.getElementById('dash-achievement-card');
+  const el   = document.getElementById('dash-achievement-content');
+  if (!achs.length || !card || !el) { card&&card.classList.add('hidden'); return; }
+  const a = achs[0];
+  card.classList.remove('hidden');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:36px">${a.icon}</div>
+      <div>
+        <div style="font-size:15px;font-weight:700">${a.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${a.category} · ${fmtDate(a.earned_at,'D MMM YYYY')}</div>
+      </div>
+    </div>`;
+}
+
+// ══ INSIGHTS PAGE ════════════════════════════════════════
+
+function renderInsights() {
+  const el = document.getElementById('insights-content');
+  if (!el) return;
+
+  const reviews = [...(P().reviews||[])].sort((a,b)=>b.weekStart>a.weekStart?1:-1);
+
+  // Always check / generate current week
+  const { start, end } = getWeekBounds(0);
+  const current = getOrGenerateReview(currentProfile, start, end);
+
+  if (!reviews.length && !current) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💡</div><div class="empty-text">No reviews yet.\nLog data for a full week to generate your first weekly insight.</div></div>`;
+    return;
+  }
+
+  const allReviews = [...(P().reviews||[])].sort((a,b)=>b.weekStart>a.weekStart?1:-1);
+
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Weekly reviews are generated from your actual data every Sunday. They update as you log more this week.</div>
+    <button class="btn btn-secondary" style="margin-bottom:12px" onclick="regenerateCurrentReview()">🔄 Refresh This Week</button>
+    ${allReviews.map(r => `
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700">Week of ${fmtDate(r.weekStart,'D MMM')}</div>
+          <div style="font-size:20px;color:var(--warning);letter-spacing:1px;margin-top:2px">${starsHTML(r.stars)}</div>
+        </div>
+        <div style="text-align:right">
+          ${r.weightChange!==null?`<div style="font-size:15px;font-weight:700;color:${r.weightChange<0?'var(--accent3)':'var(--text)'}">${r.weightChange>0?'+':''}${r.weightChange} kg</div>`:''}
+          <div style="font-size:11px;color:var(--muted)">${r.workouts} workout${r.workouts!==1?'s':''}</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:8px">
+        <div><div class="stat-label">Habits</div><div style="font-weight:600">${r.habitPct}%</div></div>
+        <div><div class="stat-label">Water Days</div><div style="font-weight:600">${r.waterDays}/7</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;font-style:italic;border-top:1px solid var(--border);padding-top:8px">"${r.narrative}"</div>
+    </div>`).join('')}`;
+}
+
+function regenerateCurrentReview() {
+  const { start, end } = getWeekBounds(0);
+  const d = DB[currentProfile];
+  if (d) d.reviews = (d.reviews||[]).filter(r => r.weekStart !== start);
+  getOrGenerateReview(currentProfile, start, end);
+  renderInsights();
+  showToast('✅ Review refreshed');
+}
+
+// ══ ACHIEVEMENTS PAGE ════════════════════════════════════
+
+function renderAchievements() {
+  const el = document.getElementById('achievements-content');
+  if (!el) return;
+
+  // Run achievement check first (catches any new ones)
+  checkAndGrantAchievements(currentProfile);
+
+  const achs = [...(P().achievements||[])].sort((a,b)=>b.earned_at>a.earned_at?1:-1);
+  const total = ACHIEVEMENT_DEFS.length;
+  const earned = achs.length;
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:12px;text-align:center">
+      <div style="font-size:32px;font-weight:800;color:var(--accent)">${earned}</div>
+      <div style="font-size:12px;color:var(--muted)">of ${total} achievements earned</div>
+      <div class="progress-wrap" style="margin-top:8px"><div class="progress-bar" style="width:${Math.round(earned/total*100)}%"></div></div>
+    </div>
+    ${achs.length===0 ? `<div class="empty"><div class="empty-icon">🎖</div><div class="empty-text">No achievements yet.\nKeep logging — your first is coming!</div></div>` : ''}
+    ${achs.map(a => `
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:32px">${a.icon}</div>
+        <div>
+          <div style="font-size:14px;font-weight:700">${a.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${a.category}</div>
+          <div style="font-size:11px;color:var(--muted)">Earned ${fmtDate(a.earned_at,'D MMM YYYY')}</div>
+        </div>
+      </div>
+    </div>`).join('')}
+    <div class="section-label">Locked</div>
+    ${ACHIEVEMENT_DEFS.filter(def=>!achs.find(a=>a.id===def.id)).map(def=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);opacity:.4">
+      <div style="font-size:24px">${def.icon}</div>
+      <div style="font-size:13px;color:var(--muted)">${def.name}</div>
+    </div>`).join('')}`;
+}
+
+// ══ CSV EXPORT ═══════════════════════════════════════════
+
+function toCSV(rows, cols) {
+  const header = cols.join(',');
+  const body   = rows.map(r => cols.map(c => {
+    const v = r[c] ?? '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }).join(',')).join('\n');
+  return header + '\n' + body;
+}
+
+function downloadCSV(content, filename) {
+  const blob = new Blob([content], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function profileToCSVRows(pid, includeProfileCol) {
+  const d    = DB[pid];
+  const prof = PROFILES[pid];
+  if (!d) return { weights:[], activities:[], nutrition:[], habits:[], achievements:[] };
+  const pCol = includeProfileCol ? { profile_name: prof?.name || pid } : {};
+
+  const weights = (d.weights||[]).map(w => ({
+    ...pCol, date:w.date, weight:w.weight||'', body_fat:w.body_fat||w.bodyFat||'', waist:w.waist||''
+  }));
+
+  const activities = (d.activities||[]).map(a => ({
+    ...pCol, date:a.date, name:a.name||a.type||'', duration:a.duration||'',
+    calories:a.calories||'', distance:a.distance||'', steps:a.steps||'', notes:a.notes||''
+  }));
+
+  const nutrition = (d.nutrition||[]).map(n => ({
+    ...pCol, date:n.date, water:n.water||0,
+    meals: Object.values(n.meals||{}).flat().map(m=>m.desc).filter(Boolean).join('; '),
+    cheat: n.cheat?'yes':'', alcohol: n.alcohol?'yes':''
+  }));
+
+  const habitRows = [];
+  Object.entries(d.habits||{}).forEach(([date, completions]) => {
+    Object.entries(completions).forEach(([hId, done]) => {
+      if (!done) return;
+      const hDef = (d.habitDefs||[]).find(h=>h.id===hId);
+      habitRows.push({ ...pCol, date, habit: hDef?.name||hId, completed:'yes' });
+    });
+  });
+
+  const achievements = (d.achievements||[]).map(a => ({
+    ...pCol, date:a.earned_at, achievement:a.name, category:a.category
+  }));
+
+  return { weights, activities, nutrition, habits:habitRows, achievements };
+}
+
+function exportCurrentProfileCSV() {
+  const pid  = currentProfile;
+  const rows = profileToCSVRows(pid, false);
+  const wCols = ['date','weight','body_fat','waist'];
+  const aCols = ['date','name','duration','calories','distance','steps','notes'];
+  const nCols = ['date','water','meals','cheat','alcohol'];
+  const hCols = ['date','habit','completed'];
+  const achCols= ['date','achievement','category'];
+
+  const parts = [
+    '# WEIGHTS\n' + toCSV(rows.weights, wCols),
+    '# ACTIVITIES\n' + toCSV(rows.activities, aCols),
+    '# NUTRITION\n' + toCSV(rows.nutrition, nCols),
+    '# HABITS\n' + toCSV(rows.habits, hCols),
+    '# ACHIEVEMENTS\n' + toCSV(rows.achievements, achCols),
+  ];
+  downloadCSV(parts.join('\n\n'), 'momentum_'+pid+'.csv');
+  showToast('📊 CSV exported');
+}
+
+function exportAllProfilesCSV() {
+  const allWeights=[], allActs=[], allNuts=[], allHabits=[], allAchs=[];
+  Object.keys(PROFILES).forEach(pid => {
+    const rows = profileToCSVRows(pid, true);
+    allWeights.push(...rows.weights);
+    allActs.push(...rows.activities);
+    allNuts.push(...rows.nutrition);
+    allHabits.push(...rows.habits);
+    allAchs.push(...rows.achievements);
+  });
+  const wCols = ['profile_name','date','weight','body_fat','waist'];
+  const aCols = ['profile_name','date','name','duration','calories','distance','steps','notes'];
+  const nCols = ['profile_name','date','water','meals','cheat','alcohol'];
+  const hCols = ['profile_name','date','habit','completed'];
+  const achCols= ['profile_name','date','achievement','category'];
+  const parts = [
+    '# WEIGHTS\n'+toCSV(allWeights,wCols),
+    '# ACTIVITIES\n'+toCSV(allActs,aCols),
+    '# NUTRITION\n'+toCSV(allNuts,nCols),
+    '# HABITS\n'+toCSV(allHabits,hCols),
+    '# ACHIEVEMENTS\n'+toCSV(allAchs,achCols),
+  ];
+  downloadCSV(parts.join('\n\n'), 'momentum_all_profiles.csv');
+  showToast('📊 All profiles CSV exported');
+}
+
+// ══ UPDATED renderMore ═══════════════════════════════════
+
+function renderMore() {
+  renderMilestones();
+  if (currentMoreTab==='more-weekly')       renderWeeklySummary();
+  if (currentMoreTab==='more-insights')     renderInsights();
+  if (currentMoreTab==='more-achievements') renderAchievements();
+  if (currentMoreTab==='more-compare')      renderCompare();
+  if (currentMoreTab==='more-data')         renderDataSummary();
+}
   const prof = PROF();
   const sw   = sortedWeights();
   const lw   = latestWeight();
@@ -2526,6 +3258,7 @@ function renderDataSummary() {
     <div class="stat-tile"><div class="stat-label">Nutrition</div><div class="stat-val">${P().nutrition.length}</div></div>`;
 
   const s = P().settings;
+  const canDelete = Object.keys(PROFILES).length > 1;
   document.getElementById('settings-content').innerHTML = `
     <div class="habit-row">
       <div><div class="habit-label">Protein Target</div><div class="habit-time">${s.protein_target||150}g / day</div></div>
@@ -2535,10 +3268,49 @@ function renderDataSummary() {
       <div><div class="habit-label">Water Target</div><div class="habit-time">${s.water_target||3}L / day</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openModal_nutSettings()">Edit</button>
     </div>
-    <div class="habit-row" style="border-bottom:none">
+    <div class="habit-row">
       <div><div class="habit-label">Edit Profile</div><div class="habit-time">${PROF().name}</div></div>
       <button class="btn btn-secondary btn-sm" onclick="openCreateProfileModal('${currentProfile}')">Edit</button>
+    </div>
+    <div class="habit-row" style="border-bottom:none">
+      <div><div class="habit-label" style="color:var(--accent2)">Delete Profile</div><div class="habit-time">Remove ${PROF().name} and all data</div></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteProfileFromSettings('${currentProfile}')" ${canDelete?'':'disabled'}>Delete</button>
     </div>`;
+}
+
+// Called from the Settings tab — no modal needed
+async function deleteProfileFromSettings(pid) {
+  if (!PROFILES[pid]) return;
+  if (Object.keys(PROFILES).length <= 1) { showToast('Cannot delete the only profile'); return; }
+
+  const profName = PROFILES[pid].name;
+  if (!confirm(`Delete "${profName}" permanently?\n\nThis will remove ALL data:\n• Weights\n• Activities\n• Nutrition\n• Habits\n• Habit definitions\n• Settings\n• Achievements\n\nThis cannot be undone.`)) return;
+
+  try {
+    if (sb && isOnline) {
+      const tables = ['weights','activities','nutrition','habits','habit_definitions','settings','achievements','weekly_reviews'];
+      }
+      const { error: profErr } = await sb.from('profiles').delete().eq('id', pid);
+      if (profErr) console.warn('[deleteProfile] profiles:', profErr.message);
+    }
+
+    delete PROFILES[pid];
+    delete DB[pid];
+    ['weights','activities','nutrition','habits','habitDefs','settings','achievements','reviews'].forEach(t => {
+      localStorage.removeItem(lsKey(pid, t));
+    });
+    lsSave('_app', 'profiles', Object.values(PROFILES));
+
+    currentProfile = Object.keys(PROFILES)[0];
+    localStorage.setItem('momentum_last_profile', currentProfile);
+    showToast(`🗑 ${profName} deleted`);
+    renderProfileSwitcher();
+    applyProfileAccent();
+    renderPage(currentPage);
+  } catch(err) {
+    console.error('[deleteProfileFromSettings]', err);
+    showToast('❌ Delete failed: ' + err.message);
+  }
 }
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════
