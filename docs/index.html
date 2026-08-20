@@ -458,7 +458,6 @@
       </select>
     </div>
     <div class="input-group"><label class="input-label">Target Weight (kg)</label><input type="number" step="0.1" class="input" id="cp-goal-weight" placeholder="e.g. 80"/></div>
-    <div class="input-group"><label class="input-label">Current Weight (kg)</label><input type="number" step="0.1" class="input" id="cp-start-weight" placeholder="e.g. 95"/></div>
     <div class="input-group"><label class="input-label">Goal Date</label><input type="date" class="input" id="cp-goal-date"/></div>
     <div class="input-group">
       <label class="input-label">Profile Color</label>
@@ -860,11 +859,12 @@ async function loadProfiles() {
     // Push legacy profiles to Supabase
     if (sb && isOnline) {
       for (const p of legacy) {
-        await sb.from('profiles').upsert({
+        const { error } = await sb.from('profiles').upsert({
           id: p.id, name: p.name, goal_weight: p.goalWeight,
-          start_weight: p.startWeight, goal_date: p.goalDate,
+          start_weight: null, goal_date: p.goalDate,
           color: p.color, goal_type: p.goalType,
-        }, { onConflict: 'id' }).catch(()=>{});
+        }, { onConflict: 'id' });
+        if (error) console.warn('Could not seed legacy profile:', p.id, error.message);
       }
     }
   }
@@ -1218,22 +1218,22 @@ function openCreateProfileModal(editId) {
 
   if (editId) {
     const p = PROFILES[editId];
+    if (!p) return;
     document.getElementById('cp-modal-title').textContent = 'Edit Profile';
     document.getElementById('cp-edit-id').value = editId;
     document.getElementById('cp-name').value = p.name;
-    document.getElementById('cp-goal-type').value = p.goalType||'lose_weight';
-    document.getElementById('cp-goal-weight').value = p.goalWeight||'';
-    document.getElementById('cp-start-weight').value = p.startWeight||'';
-    document.getElementById('cp-goal-date').value = p.goalDate||'';
-    selectedProfileColor = p.color||'#7c6bff';
+    document.getElementById('cp-goal-type').value = p.goalType || 'lose_weight';
+    document.getElementById('cp-goal-weight').value = p.goalWeight || '';
+    document.getElementById('cp-goal-date').value = p.goalDate || '';
+    selectedProfileColor = p.color || '#7c6bff';
     document.querySelectorAll('.color-swatch').forEach(b=>{b.classList.toggle('active',b.dataset.color===selectedProfileColor);});
     document.getElementById('cp-save-btn').textContent = 'Save Changes';
     document.getElementById('cp-delete-btn').classList.remove('hidden');
-    document.getElementById('cp-habit-recs').style.display='none';
+    document.getElementById('cp-habit-recs').style.display = 'none';
   } else {
     document.getElementById('cp-modal-title').textContent = 'Create Profile';
     document.getElementById('cp-edit-id').value = '';
-    ['cp-name','cp-goal-weight','cp-start-weight'].forEach(id=>document.getElementById(id).value='');
+    ['cp-name','cp-goal-weight'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('cp-goal-type').value = 'lose_weight';
     document.getElementById('cp-goal-date').value = '';
     document.getElementById('cp-save-btn').textContent = 'Create Profile';
@@ -1272,60 +1272,95 @@ async function saveProfile() {
   const editId   = document.getElementById('cp-edit-id').value;
   const name     = document.getElementById('cp-name').value.trim();
   const goalW    = toNumberOrNull(document.getElementById('cp-goal-weight').value);
-  const startW   = toNumberOrNull(document.getElementById('cp-start-weight').value);
   const goalDate = document.getElementById('cp-goal-date').value;
   const goalType = document.getElementById('cp-goal-type').value;
   if (!name) { showToast('Enter a name'); return; }
 
-  // Generate a slug id from name
-  const pid = editId || (name.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')+'-'+Date.now().toString(36));
+  // Disable save button during operation
+  const saveBtn = document.getElementById('cp-save-btn');
+  const origText = saveBtn.textContent;
+  saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
 
-  const profile = {
-    id: pid, name, goalWeight: goalW, startWeight: startW,
-    goalDate: goalDate||'2027-01-01', color: selectedProfileColor, goalType,
-  };
+  try {
+    // Generate a slug id from name (new profile) or reuse existing id (edit)
+    const pid = editId || (
+      name.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')
+      + '-' + Date.now().toString(36)
+    );
 
-  PROFILES[pid] = profile;
-  ensureProfileDB(pid);
-  lsSave('_app','profiles', Object.values(PROFILES));
+    // startWeight is no longer stored on the profile — derived from weight log
+    const profile = {
+      id: pid, name, goalWeight: goalW, startWeight: null,
+      goalDate: goalDate || '2027-01-01', color: selectedProfileColor, goalType,
+    };
 
-  // Push to Supabase profiles table
-  if (sb && isOnline) {
-    await sb.from('profiles').upsert({
-      id: pid, name, goal_weight: goalW, start_weight: startW,
-      goal_date: goalDate||'2027-01-01', color: selectedProfileColor, goal_type: goalType,
-    }, { onConflict: 'id' }).catch(e => console.warn('Profile save error:', e));
-  }
+    PROFILES[pid] = profile;
+    ensureProfileDB(pid);
+    lsSave('_app', 'profiles', Object.values(PROFILES));
 
-  // If creating new: add recommended habits
-  if (!editId && selectedHabitRecs.size > 0) {
-    const goalType2 = goalType;
-    const recs = HABIT_RECOMMENDATIONS[goalType2] || [];
-    const selectedRecs = recs.filter(h => selectedHabitRecs.has(h.name));
-    DB[pid].habitDefs = selectedRecs.map((h, i) => ({
-      id:         'hd-'+pid+'-'+i,
-      name:       h.name,
-      category:   h.category,
-      time:       '',
-      enabled:    true,
-      sort_order: i+1,
-      profile_id: pid,
-    }));
-    saveLocalCache(pid);
-    for (const hd of DB[pid].habitDefs) {
-      await pushToSupabase('habit_definitions', hd, pid);
+    // ── Push profile row to Supabase ─────────────────────
+    if (sb && isOnline) {
+      const { error: profErr } = await sb.from('profiles').upsert({
+        id: pid, name,
+        goal_weight:  goalW,
+        start_weight: null,   // always null — derived from weights table
+        goal_date:    goalDate || '2027-01-01',
+        color:        selectedProfileColor,
+        goal_type:    goalType,
+      }, { onConflict: 'id' });
+      if (profErr) {
+        console.error('[saveProfile] profiles upsert failed:', profErr);
+        showToast('❌ Could not save profile: ' + profErr.message);
+        saveBtn.textContent = origText; saveBtn.disabled = false;
+        return;
+      }
+
+      // ── Create default settings row for new profiles ──
+      if (!editId) {
+        const { error: settErr } = await sb.from('settings').upsert({
+          id:         's-' + pid,
+          profile_id: pid,
+          data:       defaultSettings(pid),
+        }, { onConflict: 'profile_id' });
+        if (settErr) console.warn('[saveProfile] settings row failed:', settErr.message);
+      }
     }
+
+    // ── Add recommended habits for new profiles ──────────
+    if (!editId && selectedHabitRecs.size > 0) {
+      const recs = HABIT_RECOMMENDATIONS[goalType] || [];
+      const chosen = recs.filter(h => selectedHabitRecs.has(h.name));
+      DB[pid].habitDefs = chosen.map((h, i) => ({
+        id:         'hd-' + pid + '-' + i,
+        name:       h.name,
+        category:   h.category,
+        time:       '',
+        enabled:    true,
+        sort_order: i + 1,
+        profile_id: pid,
+      }));
+      saveLocalCache(pid);
+      for (const hd of DB[pid].habitDefs) {
+        await pushToSupabase('habit_definitions', hd, pid);
+      }
+    }
+
+    closeModal('modal-create-profile');
+    showToast(editId ? '✅ Profile updated' : '✅ Profile created — log your first weight!');
+
+    // Switch to the new / edited profile
+    currentProfile = pid;
+    localStorage.setItem('momentum_last_profile', pid);
+    renderProfileSwitcher();
+    applyProfileAccent();
+    renderPage(currentPage);
+
+  } catch(err) {
+    console.error('[saveProfile] unexpected error:', err);
+    showToast('❌ Error: ' + err.message);
+  } finally {
+    saveBtn.textContent = origText; saveBtn.disabled = false;
   }
-
-  closeModal('modal-create-profile');
-  showToast(editId ? '✅ Profile updated' : '✅ Profile created');
-
-  // Switch to new profile
-  currentProfile = pid;
-  localStorage.setItem('momentum_last_profile', pid);
-  renderProfileSwitcher();
-  applyProfileAccent();
-  renderPage(currentPage);
 }
 
 async function deleteCurrentProfile() {
@@ -1339,7 +1374,8 @@ async function deleteCurrentProfile() {
   lsSave('_app','profiles', Object.values(PROFILES));
 
   if (sb && isOnline) {
-    await sb.from('profiles').delete().eq('id', editId).catch(()=>{});
+    const { error } = await sb.from('profiles').delete().eq('id', editId);
+    if (error) console.warn('[deleteProfile] Supabase delete failed:', error.message);
   }
 
   currentProfile = Object.keys(PROFILES)[0];
@@ -1416,9 +1452,17 @@ function dateDiffDays(a, b) {
 function sortedWeights() {
   return [...P().weights].sort((a,b) => a.date < b.date ? -1 : 1);
 }
+// Earliest weight from the log — the true "start" for this profile.
+// Falls back to prof.startWeight only if no entries exist yet.
+function earliestWeight() {
+  const s = sortedWeights();
+  return s.length ? s[0].weight : (PROF().startWeight || null);
+}
+// Latest weight from the log — always current.
+// Falls back to prof.startWeight only if no entries exist yet.
 function latestWeight() {
   const s = sortedWeights();
-  return s.length ? s[s.length-1].weight : PROF().startWeight;
+  return s.length ? s[s.length-1].weight : (PROF().startWeight || null);
 }
 function setArc(el, pct, circ) {
   if (!el) return;
@@ -1559,27 +1603,32 @@ function computeProjection(sw, prof) {
 function renderDashboard() {
   const prof = PROF();
   const sw   = sortedWeights();
-  const lw   = latestWeight();
-  const startW = prof.startWeight || lw;
-  const totalLost = +(startW - lw).toFixed(1);
-  const remaining  = +(lw - prof.goalWeight).toFixed(1);
-  const pct = startW > prof.goalWeight
-    ? Math.max(0, Math.min(100, +((totalLost/(startW - prof.goalWeight))*100).toFixed(1)))
+  const lw   = latestWeight();   // latest weight entry (or profile fallback)
+  const startW = earliestWeight(); // earliest weight entry (or profile fallback)
+  const totalLost = (startW !== null && lw !== null) ? +(startW - lw).toFixed(1) : 0;
+  const remaining  = (lw !== null && prof.goalWeight) ? +(lw - prof.goalWeight).toFixed(1) : null;
+  const range = (startW !== null && prof.goalWeight && startW > prof.goalWeight)
+    ? startW - prof.goalWeight : 0;
+  const pct = range > 0
+    ? Math.max(0, Math.min(100, +((totalLost / range) * 100).toFixed(1)))
     : 0;
   const daysLeft = daysUntil(prof.goalDate);
 
   document.getElementById('dash-date').textContent     = fmtDate(todayStr(),'dddd, D MMMM');
   document.getElementById('dash-title').textContent    = `⚡ ${prof.name}`;
-  document.getElementById('dash-days').textContent     = daysLeft;
-  document.getElementById('dash-start-w').textContent  = startW ? startW+' kg' : '—';
-  document.getElementById('dash-current').textContent  = lw+' kg';
-  document.getElementById('dash-goal-w').textContent   = prof.goalWeight+' kg';
+  document.getElementById('dash-days').textContent     = daysLeft > 0 ? daysLeft : '0';
+  document.getElementById('dash-start-w').textContent  = startW !== null ? startW+' kg' : '—';
+  document.getElementById('dash-current').textContent  = lw !== null ? lw+' kg' : '—';
+  document.getElementById('dash-goal-w').textContent   = prof.goalWeight ? prof.goalWeight+' kg' : '—';
   document.getElementById('dash-ring-pct').textContent = Math.round(pct)+'%';
   setArc(document.getElementById('dash-ring-arc'), pct, 2*Math.PI*70);
 
   const lostEl = document.getElementById('dash-lost');
   lostEl.innerHTML = totalLost > 0 ? `<span class="glow-num">${totalLost} kg</span>` : '0 kg';
-  document.getElementById('dash-remain').textContent = remaining > 0 ? remaining+' kg' : 'Goal reached! 🎉';
+  document.getElementById('dash-remain').textContent =
+    remaining === null ? '—' :
+    remaining <= 0     ? 'Goal reached! 🎉' :
+    remaining + ' kg';
 
   const proj = computeProjection(sw, prof);
   const avg7El  = document.getElementById('dash-avg7');
@@ -2276,15 +2325,17 @@ function renderMilestones() {
   const prof = PROF();
   const sw   = sortedWeights();
   const lw   = latestWeight();
-  const totalLost = +(( prof.startWeight||lw ) - lw).toFixed(1);
-  const range = (prof.startWeight||lw) - (prof.goalWeight||lw);
+  const startW = earliestWeight();  // derived from weight log, not profile field
+  const totalLost = (startW !== null && lw !== null) ? +(startW - lw).toFixed(1) : 0;
+  const goalW  = prof.goalWeight || 0;
+  const range  = (startW !== null && goalW && startW > goalW) ? startW - goalW : 0;
 
   // Weight milestones: every 5 kg from startWeight down to goalWeight
-  const startW = prof.startWeight || lw;
-  const goalW  = prof.goalWeight || 0;
   const weightMilestones = [];
-  for (let w = Math.floor(startW/5)*5; w >= goalW; w -= 5) {
-    if (w < startW) weightMilestones.push({ w, icon: w <= goalW ? '🏆' : '⚡' });
+  if (startW !== null) {
+    for (let w = Math.floor(startW/5)*5; w >= goalW; w -= 5) {
+      if (w < startW) weightMilestones.push({ w, icon: w <= goalW ? '🏆' : '⚡' });
+    }
   }
 
   const milestones = [
@@ -2384,13 +2435,15 @@ function renderCompare() {
   const cards = allProfiles.map(prof => {
     const pid  = prof.id;
     if (!DB[pid]) return '';
-    const ws   = [...(DB[pid].weights||[])].sort((a,b)=>a.date<b.date?-1:1);
-    const lw   = ws.length ? ws[ws.length-1].weight : (prof.startWeight||null);
-    const startW = prof.startWeight || lw;
-    const totalLost = startW&&lw ? +(startW - lw).toFixed(1) : 0;
-    const range  = startW&&prof.goalWeight ? startW - prof.goalWeight : 1;
-    const pct    = range>0 ? Math.max(0,Math.min(100,+(totalLost/range*100).toFixed(1))) : 0;
-    const proj   = ws.length>=14 ? computeProjection(ws, prof) : null;
+    const ws     = [...(DB[pid].weights||[])].sort((a,b)=>a.date<b.date?-1:1);
+    // Derive start from earliest log entry, fall back to prof.startWeight
+    const startW = ws.length ? ws[0].weight : (prof.startWeight || null);
+    const lw     = ws.length ? ws[ws.length-1].weight : (prof.startWeight || null);
+    const totalLost = (startW !== null && lw !== null) ? +(startW - lw).toFixed(1) : 0;
+    const range  = (startW && prof.goalWeight && startW > prof.goalWeight)
+      ? startW - prof.goalWeight : 1;
+    const pct    = range > 0 ? Math.max(0, Math.min(100, +(totalLost/range*100).toFixed(1))) : 0;
+    const proj   = ws.length >= 14 ? computeProjection(ws, prof) : null;
     const col    = prof.color || '#7c6bff';
     return `<div class="compare-card" style="border-color:${col}44">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
